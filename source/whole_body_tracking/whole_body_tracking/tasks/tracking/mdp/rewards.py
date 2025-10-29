@@ -80,3 +80,23 @@ def feet_contact_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, thresh
     last_contact_time = contact_sensor.data.last_contact_time[:, sensor_cfg.body_ids]
     reward = torch.sum((last_contact_time < threshold) * first_air, dim=-1)
     return reward
+
+def contact_state(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+    threshold = 10.0
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    net_forces_w = contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids]
+    contact_mask = (torch.linalg.norm(net_forces_w, dim=-1) > threshold)  # (N, |body_ids|)
+    pred_contact_mask = torch.sigmoid(env.ft_rew_info["components"]["w"])
+    lse = torch.sum(torch.square(contact_mask.float() - pred_contact_mask), dim=-1)
+    return lse
+
+def centroid_velocity(env: ManagerBasedRLEnv):
+    command_name = "motion"
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    body_indexes = _get_body_indexes(command, ["Trunk"])
+    linvel = command.body_lin_vel_w[:, body_indexes][:, 0, :]
+    des_linvel = env.ft_rew_info["components"]["des_com_vel"][:, :3]
+    lse = torch.sum(torch.square(linvel - des_linvel), dim=-1)
+
+    linvel_rew = torch.exp(-lse / 0.25)
+    return linvel_rew

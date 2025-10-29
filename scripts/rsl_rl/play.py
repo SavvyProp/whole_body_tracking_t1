@@ -147,7 +147,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     export_motion_policy_as_onnx(
         env.unwrapped,
         ppo_runner.alg.policy,
-        normalizer=ppo_runner.obs_normalizer,
         path=export_model_dir,
         filename="policy.onnx",
     )
@@ -161,6 +160,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs)
+            if actions.ndim == 1:
+                actions = torch.reshape(actions, (1, -1))
             # env stepping
             obs, _, _, _ = env.step(actions)
         if args_cli.video:

@@ -55,7 +55,7 @@ from isaaclab.utils.math import axis_angle_from_quat, quat_conjugate, quat_mul, 
 ##
 # Pre-defined configs
 ##
-from whole_body_tracking.robots.g1 import G1_CYLINDER_CFG
+from whole_body_tracking.robots.t1 import BOOSTER_T1_CFG
 
 
 @configclass
@@ -75,7 +75,7 @@ class ReplayMotionsSceneCfg(InteractiveSceneCfg):
     )
 
     # articulation
-    robot: ArticulationCfg = G1_CYLINDER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = BOOSTER_T1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
 
 class MotionLoader:
@@ -101,17 +101,23 @@ class MotionLoader:
 
     def _load_motion(self):
         """Loads the motion from the csv file."""
-        if self.frame_range is None:
-            motion = torch.from_numpy(np.loadtxt(self.motion_file, delimiter=","))
-        else:
-            motion = torch.from_numpy(
-                np.loadtxt(
-                    self.motion_file,
-                    delimiter=",",
-                    skiprows=self.frame_range[0] - 1,
-                    max_rows=self.frame_range[1] - self.frame_range[0] + 1,
-                )
-            )
+        #if self.frame_range is None:
+        #    motion = torch.from_numpy(np.loadtxt(self.motion_file, delimiter=","))
+        #else:
+        #    motion = torch.from_numpy(
+        #        np.loadtxt(
+        #            self.motion_file,
+        #            delimiter=",",
+        #            skiprows=self.frame_range[0] - 1,
+        #            max_rows=self.frame_range[1] - self.frame_range[0] + 1,
+        #        )
+        #    )
+        data = np.load(self.motion_file)
+        root_pos = torch.from_numpy(data["root_pos"])
+        root_quat = torch.from_numpy(data["root_rot"])
+        joint_pos = torch.from_numpy(data["dof_pos"])
+        motion = torch.cat([root_pos, root_quat, joint_pos], dim=1)
+        self.input_fps = data["fps"]
         motion = motion.to(torch.float32).to(self.device)
         self.motion_base_poss_input = motion[:, :3]
         self.motion_base_rots_input = motion[:, 3:7]
@@ -329,36 +335,30 @@ def main():
         sim,
         scene,
         joint_names=[
-            "left_hip_pitch_joint",
-            "left_hip_roll_joint",
-            "left_hip_yaw_joint",
-            "left_knee_joint",
-            "left_ankle_pitch_joint",
-            "left_ankle_roll_joint",
-            "right_hip_pitch_joint",
-            "right_hip_roll_joint",
-            "right_hip_yaw_joint",
-            "right_knee_joint",
-            "right_ankle_pitch_joint",
-            "right_ankle_roll_joint",
-            "waist_yaw_joint",
-            "waist_roll_joint",
-            "waist_pitch_joint",
-            "left_shoulder_pitch_joint",
-            "left_shoulder_roll_joint",
-            "left_shoulder_yaw_joint",
-            "left_elbow_joint",
-            "left_wrist_roll_joint",
-            "left_wrist_pitch_joint",
-            "left_wrist_yaw_joint",
-            "right_shoulder_pitch_joint",
-            "right_shoulder_roll_joint",
-            "right_shoulder_yaw_joint",
-            "right_elbow_joint",
-            "right_wrist_roll_joint",
-            "right_wrist_pitch_joint",
-            "right_wrist_yaw_joint",
-        ],
+                "AAHead_yaw",
+                "Head_pitch",
+                "Left_Shoulder_Pitch",
+                "Left_Shoulder_Roll",
+                "Left_Elbow_Pitch",
+                "Left_Elbow_Yaw",
+                "Right_Shoulder_Pitch",
+                "Right_Shoulder_Roll",
+                "Right_Elbow_Pitch",
+                "Right_Elbow_Yaw",
+                "Waist",
+                "Left_Hip_Pitch",
+                "Left_Hip_Roll",
+                "Left_Hip_Yaw",
+                "Left_Knee_Pitch",
+                "Left_Ankle_Pitch",
+                "Left_Ankle_Roll",
+                "Right_Hip_Pitch",
+                "Right_Hip_Roll",
+                "Right_Hip_Yaw",
+                "Right_Knee_Pitch",
+                "Right_Ankle_Pitch",
+                "Right_Ankle_Roll",
+            ],
     )
 
 

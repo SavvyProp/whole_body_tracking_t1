@@ -104,6 +104,10 @@ class ActionsCfg:
     """Action specifications for the MDP."""
 
     joint_pos = mdp.JointPositionActionCfg(asset_name="robot", joint_names=[".*"], use_default_offset=True)
+    joint_ff_torque = mdp.JointEffortActionCfg(
+        asset_name="robot",
+        joint_names=[".*"],
+    )
 
 
 @configclass
@@ -242,11 +246,31 @@ class RewardsCfg:
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
                 body_names=[
-                    r"^(?!left_ankle_roll_link$)(?!right_ankle_roll_link$)(?!left_wrist_yaw_link$)(?!right_wrist_yaw_link$).+$"
+                    r"^(?!left_foot_link$)(?!right_foot_link$)(?!left_hand_link$)(?!right_hand_link$).+$"
                 ],
             ),
             "threshold": 1.0,
         },
+    )
+    contact_ft = RewTerm(
+        func=mdp.contact_state,
+        weight=-1.0,
+        params={
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=[
+                    "left_hand_link",
+                    "right_hand_link",
+                    "left_foot_link",
+                    "right_foot_link",
+                ],
+            ),
+        }
+    )
+    centroid_vel = RewTerm(
+        func=mdp.centroid_velocity,
+        weight=0.50,
+        params = {}
     )
 
 
@@ -291,7 +315,7 @@ class CurriculumCfg:
 
 
 @configclass
-class TrackingEnvCfg(ManagerBasedRLEnvCfg):
+class TrackingFTEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
