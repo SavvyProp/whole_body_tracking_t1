@@ -299,7 +299,7 @@ def step(com_pos, com_vel,
     )
     torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
     tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
-    return comp_dict["des_pos"], tau * 0.0
+    return comp_dict["des_pos"], tau
 
 def ft_rew_info(qvel, action):
     return {
