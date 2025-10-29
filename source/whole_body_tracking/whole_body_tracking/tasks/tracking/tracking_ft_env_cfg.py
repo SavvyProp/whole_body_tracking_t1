@@ -233,7 +233,7 @@ class RewardsCfg:
         weight=1.0,
         params={"command_name": "motion", "std": 3.14},
     )
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-1e-1)
+    action_rate_l2 = RewTerm(func=mdp.ft_action_rate_l2, weight=-1e-1)
     joint_limit = RewTerm(
         func=mdp.joint_pos_limits,
         weight=-10.0,
@@ -269,7 +269,7 @@ class RewardsCfg:
     )
     centroid_vel = RewTerm(
         func=mdp.centroid_velocity,
-        weight=0.50,
+        weight=0.5,
         params = {}
     )
 

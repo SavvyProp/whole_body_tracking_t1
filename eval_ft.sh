@@ -1,0 +1,1 @@
+python scripts/rsl_rl/play.py --task=Tracking-FT-T1-v0 --num_envs=2 --wandb_path=ludwigtaycheeying-purdue-university/t1ft_flat/t8v364b6

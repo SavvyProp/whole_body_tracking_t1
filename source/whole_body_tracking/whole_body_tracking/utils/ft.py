@@ -23,13 +23,13 @@ EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot
 EEF_IDS = [bodies.index(name) for name in EEF_BODIES]
 
 def ctrl2logits(act):
-    des_pos = act[..., 0:CTRL_NUM]
-    des_com_vel = act[..., CTRL_NUM:CTRL_NUM + 3]
-    des_com_angvel = act[..., CTRL_NUM + 3 : CTRL_NUM + 6]
-    w = act[..., CTRL_NUM + 6 : CTRL_NUM + EEF_NUM + 6]
-    torque = act[..., CTRL_NUM + EEF_NUM + 6:
+    des_pos = act[:, 0:CTRL_NUM]
+    des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3]
+    des_com_angvel = act[:, CTRL_NUM + 3 : CTRL_NUM + 6]
+    w = act[:, CTRL_NUM + 6 : CTRL_NUM + EEF_NUM + 6]
+    torque = act[:, CTRL_NUM + EEF_NUM + 6:
               CTRL_NUM * 2 + EEF_NUM + 6]
-    d_gain = act[..., -2:]
+    d_gain = act[:, -2:]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
@@ -58,7 +58,7 @@ def ctrl2components(act, qvel):
 
     torque_logit = torch.tanh(logits["torque"])
     torque_limits = TORQUE_LIMITS.to(torque_logit.device)
-    joint_vel = qvel[CTRL_NUM][..., 6:]
+    joint_vel = qvel[..., 6:]
     tau_naive = torque_limits[None, :] * torque_logit
     spd_fac = torch.clip(torch.abs(joint_vel), min = 0.0, max = 10.0) / 10.0
     sign = torch.where(joint_vel * torque_logit >= 0, 1.0, 0.0)
@@ -124,29 +124,47 @@ def f_mag_q(w):
 
 def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor):
     """
-    jacs:    (N, 6*EEF_NUM, 6+CTRL_NUM)  stacked 6D Jacobians per EEF
-    tau_ref: (N, CTRL_NUM)               reference joint torques
+    jacs:    (N, 6*EEF_NUM, 6+CTRL_NUM) or (6*EEF_NUM, 6+CTRL_NUM)
+    tau_ref: (N, CTRL_NUM)              or (CTRL_NUM,)
 
     Returns:
-      big_q:   (N, 6*EEF_NUM, 6*EEF_NUM) = (J_j^T @ J_j)
-      small_q: (N, 6*EEF_NUM)            = (J_j^T @ tau_ref)
-    where J_j = -J[:, :, 6:]  (exclude the 6 base dofs)
+      big_q:   (N, 6*EEF_NUM, 6*EEF_NUM) = J_j @ J_j^T
+      small_q: (N, 6*EEF_NUM)            = J_j @ tau_ref
+    where J_j = -jacs[..., :, 6:]  (exclude the 6 base dofs)
     """
-    # Ensure dtype/device alignment and batch dim
-    tau_ref = tau_ref.to(jacs.device, jacs.dtype)
-    if tau_ref.dim() == 1:
-        tau_ref = tau_ref.unsqueeze(0)
+    device, dtype = jacs.device, jacs.dtype
 
-    # J_j: (N, 6*EEF_NUM, CTRL_NUM)
+    # Normalize jacs to (N, F, 6+CTRL)
+    if jacs.dim() == 2:
+        jacs = jacs.unsqueeze(0)
+    jacs = jacs.to(dtype=dtype)
+    N, F, _ = jacs.shape
+
+    # J_j: (N, F, CTRL)
     J_j = -jacs[..., :, 6:]
-    # mat = J_j^T: (N, CTRL_NUM, 6*EEF_NUM)
-    mat = J_j.transpose(-1, -2)
+    CTRL = J_j.shape[-1]
 
-    # big_q = (J_j^T @ J_j): (N, 6*EEF_NUM, 6*EEF_NUM)
-    big_q = torch.matmul(mat.transpose(-1, -2), mat)
+    # Normalize tau_ref to (N, CTRL)
+    if tau_ref.dim() == 1:
+        tau_ref = tau_ref.unsqueeze(0)          # (1, CTRL)
+    else:
+        tau_ref = tau_ref.reshape(-1, tau_ref.shape[-1])  # (N?, CTRL)
+    tau_ref = tau_ref.to(device=device, dtype=dtype)
 
-    # small_q = (J_j^T @ tau_ref): (N, 6*EEF_NUM)
-    small_q = torch.matmul(mat.transpose(-1, -2), tau_ref.unsqueeze(-1)).squeeze(-1)
+    if tau_ref.shape[-1] != CTRL:
+        raise ValueError(f"CTRL dim mismatch: J_j has {CTRL} but tau_ref has {tau_ref.shape[-1]}")
+
+    # Expand or validate batch
+    if tau_ref.shape[0] == 1 and N > 1:
+        tau_ref = tau_ref.expand(N, -1)
+    elif tau_ref.shape[0] != N:
+        raise ValueError(f"Batch mismatch: jacs batch {N} vs tau_ref batch {tau_ref.shape[0]}")
+
+    # big_q: (N, F, F)
+    big_q = J_j @ J_j.transpose(-1, -2)
+
+    # small_q: (N, F) using bmm to avoid broadcasting surprises
+    small_q = torch.bmm(J_j, tau_ref.unsqueeze(-1)).squeeze(-1)
 
     return big_q, small_q
 
@@ -281,7 +299,7 @@ def step(com_pos, com_vel,
     )
     torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
     tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
-    return comp_dict["des_pos"], tau
+    return comp_dict["des_pos"], tau * 0.0
 
 def ft_rew_info(qvel, action):
     return {

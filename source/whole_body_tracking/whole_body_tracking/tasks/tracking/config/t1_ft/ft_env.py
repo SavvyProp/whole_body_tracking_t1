@@ -3,6 +3,7 @@ from isaaclab.envs import ManagerBasedRLEnv
 from isaaclab.managers import ActionManager
 import torch
 from whole_body_tracking.utils import ft
+from isaaclab.managers import ActionManager, EventManager, ObservationManager, RecorderManager
 from isaaclab.managers import CommandManager, CurriculumManager, RewardManager, TerminationManager
 from isaaclab.ui.widgets import ManagerLiveVisualizer
 # Implementation of FT environment. Idea is to implement the pure FT
@@ -30,8 +31,18 @@ def model_based_controller(robot, action):
     com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
 
     pos, ff_torque = ft.step(com_pos, com_vel, jacs, body_pos_w, qpos, qvel, action)
+    #ff_torque = action[:, 23:46] * 0.05
+    
     torque_action = torch.concat([pos, ff_torque], dim=1)
     return torque_action
+
+def make_ft_rew_dict(robot, action):
+    joint_vel = robot.data.joint_vel.clone()  # (N, num_joints)
+    base_dq = torch.cat([robot.data.root_com_lin_vel_w, 
+                        robot.data.root_com_ang_vel_w], dim=-1)  # (N, 6)
+    qvel = torch.cat([base_dq, joint_vel], dim=-1)  # (N, 6 + num_joints)
+
+    return ft.ft_rew_info(qvel, action)
 
 class FTActionManager(ActionManager):
     @property
@@ -48,7 +59,7 @@ class FTActionManager(ActionManager):
 
     def update_torques(self, torque_action):
         idx = 0
-        for term in self._terms.values():
+        for term_name, term in self._terms.items():
             term_actions = torque_action[:, idx : idx + term.action_dim]
             term.process_actions(term_actions)
             idx += term.action_dim
@@ -65,9 +76,17 @@ class FTEnv(ManagerBasedRLEnv):
         self.command_manager: CommandManager = CommandManager(self.cfg.commands, self)
         print("[INFO] Command Manager: ", self.command_manager)
 
-        # call the parent class to load the managers for observations and actions.
-        super().load_managers()
+        print("[INFO] Event Manager: ", self.event_manager)
+        # -- recorder manager
+        self.recorder_manager = RecorderManager(self.cfg.recorders, self)
+        print("[INFO] Recorder Manager: ", self.recorder_manager)
+        # -- action manager
+        # -- observation manager
         self.action_manager = FTActionManager(self.cfg.actions, self)
+
+        self.observation_manager = ObservationManager(self.cfg.observations, self)
+        print("[INFO] Observation Manager:", self.observation_manager)
+
 
         # prepare the managers
         # -- termination manager
@@ -116,12 +135,9 @@ class FTEnv(ManagerBasedRLEnv):
         # note: checked here once to avoid multiple checks within the loop
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
 
-        joint_vel = self.scene["robot"].data.joint_vel  # (N, num_joints)
-        base_dq = torch.cat([self.scene["robot"].data.root_com_lin_vel_w, 
-                             self.scene["robot"].data.root_com_ang_vel_w], dim=-1)  # (N, 6)
-        qvel = torch.cat([base_dq, joint_vel], dim=-1)  # (N, 6 + num_joints)
-
-        self.ft_rew_info = ft.ft_rew_info(qvel, action)
+        with torch.no_grad():
+            action_ = action.clone()
+            self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], action_)
 
         # perform physics stepping
         for _ in range(self.cfg.decimation):
