@@ -40,7 +40,7 @@ def ctrl2logits(act):
     }
     return logits
 
-def ctrl2components(act, qvel):
+def ctrl2components(act, joint_vel):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
 
@@ -58,7 +58,6 @@ def ctrl2components(act, qvel):
 
     torque_logit = torch.tanh(logits["torque"])
     torque_limits = TORQUE_LIMITS.to(torque_logit.device)
-    joint_vel = qvel[..., 6:]
     tau_naive = torque_limits[None, :] * torque_logit
     spd_fac = torch.clip(torch.abs(joint_vel), min = 0.0, max = 10.0) / 10.0
     sign = torch.where(joint_vel * torque_logit >= 0, 1.0, 0.0)
@@ -83,7 +82,7 @@ def make_centroidal_ag(
 ):
     r = eefpos - com_pos[:, None, :]
     f_blocks = []
-    batch_invI = INV_ANGULAR_INERTIA.to(r.device, r.dtype).expand(r.shape[0], -1, -1)  # (N,3,3)
+    batch_invI = INV_ANGULAR_INERTIA.expand(r.shape[0], -1, -1)  # (N,3,3)
     for i in range(EEF_NUM):
         v = r[:, i, :]  # (N, 3)
         S = torch.zeros(v.shape[0], 3, 3, device=v.device, dtype=v.dtype)
@@ -99,7 +98,7 @@ def make_centroidal_ag(
         f_block = torch.cat([f_top, f_bot], dim=1)  # (N, 6,6)
         f_blocks.append(f_block)
     a = torch.cat(f_blocks, dim=2)  # (N, 6, 6*EEF_NUM)
-    g = torch.tensor([0, 0, -9.81, 0, 0, 0], device=eefpos.device, dtype=eefpos.dtype)  # (6,)
+    g = torch.tensor([0, 0, -9.81, 0, 0, 0], device=eefpos.device)  # (6,)
     return a, g
 
 def f_mag_q(w):
@@ -256,27 +255,27 @@ def ft_ref(
     tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
     return tau.squeeze(-1)
 
-def highlvlPD(qpos, qvel, 
+def highlvlPD(base_quat, base_angvel, 
               lin_gain, angvel_gain,
               des_vel, des_angvel,
               com_vel):
-    q_wb = qpos[:, 3:7]
+    q_wb = base_quat
     global_des_vel = quat_apply(q_wb, des_vel)
 
     com_acc = lin_gain[:, None] * (global_des_vel - com_vel)
 
-    com_angvel = qvel[:, 3:6]
+    com_angvel = base_angvel
     ang_acc = angvel_gain[:, None] * (des_angvel - com_angvel)
     return com_acc, ang_acc
 
 def step(com_pos, com_vel,
          jacs,
          eefpos,
-         qpos, qvel,
+         base_quat, base_angvel, joint_vel,
          action):
-    comp_dict = ctrl2components(action, qvel)
+    comp_dict = ctrl2components(action, joint_vel)
     com_acc, ang_acc = highlvlPD(
-        qpos, qvel,
+        base_quat, base_angvel,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
         comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
         com_vel
@@ -303,8 +302,8 @@ try:
 except Exception as _e:
     print("[INFO] torch.compile disabled; using eager mode:", _e)
 
-def ft_rew_info(qvel, action):
+def ft_rew_info(joint_vel, action):
     return {
         "logits": ctrl2logits(action),
-        "components": ctrl2components(action, qvel)
+        "components": ctrl2components(action, joint_vel)
     }

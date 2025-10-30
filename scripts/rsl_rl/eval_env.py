@@ -160,18 +160,21 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     eval_name = "eval_data/ft_eval_data.npz"
 
-    iters = 20
+    iters = 16
 
-    terminated = np.zeros((iters, env_cfg.scene.num_envs), dtype=bool)
-    root_pos_error = np.zeros((iters, env_cfg.scene.num_envs, 700))
+    duration = 200
+
+    terminated = np.zeros((iters, env_cfg.scene.num_envs, duration), dtype=bool)
+    root_pos_error = np.zeros((iters, env_cfg.scene.num_envs, duration))
     forces = np.zeros((iters,))
 
     for i in range(iters):
+        print(f"[INFO] Starting eval iteration {i+1}/{iters}")
         with torch.inference_mode():
-            env.reset()
+            obs, _ = env.reset()
         force_mag = i * 50 + 200.0
         forces[i] = force_mag
-        for c in range(500):
+        for c in range(duration):
             # run everything in inference mode
             set_random_force(env.unwrapped, c, force_mag)
             with torch.inference_mode():
@@ -181,7 +184,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                     actions = torch.reshape(actions, (1, -1))
                 # env stepping
                 obs, _, terminated_, _ = env.step(actions)
-                terminated[i, :] = np.logical_or(terminated[i, :], terminated_.cpu().numpy())
+                terminated[i, :, c] = terminated_.cpu().numpy()
                 pos_error = motion_global_anchor_position_error_exp(env)
                 root_pos_error[i, :, c] = pos_error.cpu().numpy()
             if args_cli.video:
@@ -208,7 +211,7 @@ def set_random_force(env, step, frc_mag):
     # apply random impulse forces to the robot at if timestep meets threshold
     # round(sin(env_num / 6) * 100 + 150 ) == step
     frc_mask = torch.arange(num_envs, device=env.device)
-    frc_mask = torch.round(torch.sin(frc_mask / 6) * 100 + 150).to(torch.int64)
+    frc_mask = torch.round(torch.sin(frc_mask / 6) * 30 + 50).to(torch.int64)
     
     frc = torch.randn((num_envs, 3), device=env.device)
     frc = frc * frc_mag / torch.linalg.norm(frc, dim=-1, keepdim=True)

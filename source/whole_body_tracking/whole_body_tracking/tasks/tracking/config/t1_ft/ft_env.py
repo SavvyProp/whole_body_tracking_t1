@@ -6,6 +6,7 @@ from whole_body_tracking.utils import ft
 from isaaclab.managers import ActionManager, EventManager, ObservationManager, RecorderManager
 from isaaclab.managers import CommandManager, CurriculumManager, RewardManager, TerminationManager
 from isaaclab.ui.widgets import ManagerLiveVisualizer
+import time
 # Implementation of FT environment. Idea is to implement the pure FT
 # function and save a ft_info dict as part of the env class
 # No observation change, contact rewards, centroid velocity rewards
@@ -13,36 +14,32 @@ from isaaclab.ui.widgets import ManagerLiveVisualizer
 # Implementation note: build a custom ActionManager with overriden action size
 # ActionManager should have the big action size
 
+
 def model_based_controller(robot, action):
     body_pos_w = robot.data.body_pos_w
+
     jacs = robot.root_physx_view.get_jacobians()
-    base_q = torch.cat([robot.data.root_link_pos_w, robot.data.root_link_quat_w], dim=-1)  # (N, 7)
+    # Base position (world): pos (3) + quat (4)
+    
+    base_quat = robot.data.root_link_quat_w  # (N, 3)
 
-    joint_pos = robot.data.joint_pos  # (N, num_joints)
     joint_vel = robot.data.joint_vel  # (N, num_joints)
-    # Base velocities (world): linear (3) + angular (3)
-    base_dq = torch.cat([robot.data.root_com_lin_vel_w, robot.data.root_com_ang_vel_w], dim=-1)  # (N, 6)
 
-    # Full generalized coordinates/velocities
-    qpos  = torch.cat([base_q,  joint_pos], dim=-1)  # (N, 7 + num_joints)
-    qvel = torch.cat([base_dq, joint_vel], dim=-1)  # (N, 6 + num_joints)
+    base_angvel = robot.data.root_com_ang_vel_b
 
-    com_pos = robot.data.root_com_pos_w  # (N, 3)
+    com_pos = robot.data.root_link_pos_w  # (N, 3)
     com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
-
-    pos, ff_torque = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, qpos, qvel, action)
+    
+    pos, ff_torque = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
+                             base_quat, base_angvel, joint_vel, action)
     #ff_torque = action[:, 23:46] * 0.05
 
-    torque_action = torch.concat([pos, ff_torque], dim=1)
-    return torque_action
+    return pos, ff_torque
 
 def make_ft_rew_dict(robot, action):
     joint_vel = robot.data.joint_vel.clone()  # (N, num_joints)
-    base_dq = torch.cat([robot.data.root_com_lin_vel_w, 
-                        robot.data.root_com_ang_vel_w], dim=-1)  # (N, 6)
-    qvel = torch.cat([base_dq, joint_vel], dim=-1)  # (N, 6 + num_joints)
 
-    return ft.ft_rew_info(qvel, action)
+    return ft.ft_rew_info(joint_vel, action)
 
 class FTActionManager(ActionManager):
     @property
@@ -57,10 +54,13 @@ class FTActionManager(ActionManager):
         self._prev_action[:] = self._action
         self._action[:] = action.to(self.device)
 
-    def update_torques(self, torque_action):
+    def update_torques(self, pos, torque):
         idx = 0
         for term_name, term in self._terms.items():
-            term_actions = torque_action[:, idx : idx + term.action_dim]
+            if term_name == "joint_pos":
+                term_actions = pos
+            else:  # torque
+                term_actions = torque
             term.process_actions(term_actions)
             idx += term.action_dim
 
@@ -140,11 +140,12 @@ class FTEnv(ManagerBasedRLEnv):
             self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], action_)
 
         # perform physics stepping
-        for _ in range(self.cfg.decimation):
+        for i in range(self.cfg.decimation):
             self._sim_step_counter += 1
             # set actions into buffers
-            torque_action = model_based_controller(self.scene["robot"], self.action_manager._action)
-            self.action_manager.update_torques(torque_action)
+            if i % 1 == 0:
+                pos, torque = model_based_controller(self.scene["robot"], self.action_manager._action)
+                self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
             # set actions into simulator
             self.scene.write_data_to_sim()
