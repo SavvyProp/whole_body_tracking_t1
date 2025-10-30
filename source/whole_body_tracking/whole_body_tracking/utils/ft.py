@@ -9,13 +9,13 @@ EEF_NUM = 4
 
 TORQUE_LIMITS = torch.tensor([
     7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 30, 30, 18, 18, 30, 30, 60, 60, 20, 20, 15, 15
-])
+], device = "cuda")
 
 MASS = 31.614357
 ANGULAR_INERTIA = torch.tensor(
     [[ 2.77498525e+00,  5.36123413e-04,  2.12637797e-01],
  [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03],
- [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]])
+ [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]], device = "cuda")
 INV_ANGULAR_INERTIA = torch.linalg.inv(ANGULAR_INERTIA)
 
 EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
@@ -44,15 +44,15 @@ def ctrl2components(act, qvel):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
 
-    logits["des_com_angvel"] *= 0.20
-    des_angvel_mag = torch.norm(logits["des_com_angvel"], dim =-1, keepdim=True)
+    des_angvel = logits["des_com_angvel"] * 0.20
+    des_angvel_mag = torch.norm(des_angvel, dim =-1, keepdim=True)
     des_angvel_mag_clipped = torch.clamp(des_angvel_mag, max = 2.0)
-    des_angvel = logits["des_com_angvel"] * (des_angvel_mag_clipped / (1e-6 + des_angvel_mag))
+    des_angvel = des_angvel * (des_angvel_mag_clipped / (1e-6 + des_angvel_mag))
     
-    logits["des_com_vel"] *= 0.05
-    des_vel_mag = torch.norm(logits["des_com_vel"], dim =-1, keepdim=True)
+    des_com_vel = logits["des_com_vel"] * 0.05
+    des_vel_mag = torch.norm(des_com_vel, dim =-1, keepdim=True)
     des_vel_mag_clipped = torch.clamp(des_vel_mag, max = 3.0)
-    des_vel = logits["des_com_vel"] * (des_vel_mag_clipped / (1e-6 + des_vel_mag))
+    des_vel = des_com_vel * (des_vel_mag_clipped / (1e-6 + des_vel_mag))
 
     w = logits["w"]
 
@@ -225,12 +225,7 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
 
     rhs = torch.cat([c, b], dim=-1)                         # (..., F+M)
 
-    # Solve KKT @ sol_all = rhs
-    try:
-        sol_all = torch.linalg.solve(KKT, rhs.unsqueeze(-1)).squeeze(-1)  # (..., F+M)
-    except RuntimeError:
-        # Fallback to least-squares if singular
-        sol_all = torch.linalg.lstsq(KKT, rhs.unsqueeze(-1)).solution.squeeze(-1)
+    sol_all = torch.linalg.solve(KKT, rhs.unsqueeze(-1)).squeeze(-1)
 
     sol = sol_all[..., :F]                                   # (..., F)
 
@@ -300,6 +295,13 @@ def step(com_pos, com_vel,
     torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
     tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
     return comp_dict["des_pos"], tau
+
+try:
+    jit_step = torch.compile(step)
+    # You can also compile other hot helpers if desired:
+    # ft_ref = torch.compile(ft_ref, mode="max-autotune", fullgraph=False)
+except Exception as _e:
+    print("[INFO] torch.compile disabled; using eager mode:", _e)
 
 def ft_rew_info(qvel, action):
     return {

@@ -30,9 +30,9 @@ def model_based_controller(robot, action):
     com_pos = robot.data.root_com_pos_w  # (N, 3)
     com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
 
-    pos, ff_torque = ft.step(com_pos, com_vel, jacs, body_pos_w, qpos, qvel, action)
+    pos, ff_torque = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, qpos, qvel, action)
     #ff_torque = action[:, 23:46] * 0.05
-    
+
     torque_action = torch.concat([pos, ff_torque], dim=1)
     return torque_action
 
