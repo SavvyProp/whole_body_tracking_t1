@@ -65,7 +65,7 @@ def ctrl2components(act, joint_vel):
 
     d_gain_lin = torch.tanh(logits["d_gain"][:, 0]) * 3.0 + 4.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = torch.tanh(logits["d_gain"][:, 1]) * 0.05 + 0.07
+    d_gain_angvel = torch.tanh(logits["d_gain"][:, 1]) * 0.20 + 0.30
 
     return {
         "des_pos": des_pos,
@@ -295,7 +295,9 @@ def step(com_pos, com_vel,
     )
     torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
     tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
-    return comp_dict["des_pos"], tau
+    no_contact_fac = torch.clamp(torch.sum(torch.sigmoid(comp_dict["w"]), dim = -1), min = 0, max = 1)
+    tau = tau * no_contact_fac[:, None]
+    return comp_dict["des_pos"], tau 
 
 try:
     jit_step = torch.compile(step)
