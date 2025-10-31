@@ -65,7 +65,7 @@ def ctrl2components(act, joint_vel):
 
     d_gain_lin = torch.tanh(logits["d_gain"][:, 0]) * 3.0 + 4.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = torch.tanh(logits["d_gain"][:, 1]) * 0.20 + 0.30
+    d_gain_angvel = torch.tanh(logits["d_gain"][:, 1]) * 0.10 + 0.11
 
     return {
         "des_pos": des_pos,
