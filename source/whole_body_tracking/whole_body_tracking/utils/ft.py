@@ -260,7 +260,10 @@ def ft_ref(
 def highlvlPD(base_quat, base_angvel, 
               lin_gain, angvel_gain,
               des_vel, des_angvel,
-              com_vel):
+              com_vel, w):
+    default_acc = torch.tensor([0, 0, -9.81], device=base_quat.device)
+    default_angacc = torch.tensor([0, 0, 0], device=base_quat.device)
+    num_contacts = torch.clamp(torch.sum(torch.sigmoid(w * 2), axis = -1), min = 0.0, max = 1.0)
     q_wb = base_quat
     global_des_vel = quat_apply(q_wb, des_vel)
 
@@ -268,6 +271,9 @@ def highlvlPD(base_quat, base_angvel,
 
     com_angvel = base_angvel
     ang_acc = angvel_gain[:, None] * (des_angvel - com_angvel)
+
+    com_acc = com_acc * (1.0 - num_contacts[:, None]) + default_acc[None, :] * num_contacts[:, None]
+    ang_acc = ang_acc * (1.0 - num_contacts[:, None]) + default_angacc[None, :] * num_contacts[:, None]
     return com_acc, ang_acc
 
 def step(com_pos, com_vel,
@@ -280,7 +286,7 @@ def step(com_pos, com_vel,
         base_quat, base_angvel,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
         comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
-        com_vel
+        com_vel, comp_dict["w"]
     )
 
     idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
@@ -295,9 +301,7 @@ def step(com_pos, com_vel,
     )
     torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
     tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
-    no_contact_fac = torch.clamp(torch.sum(torch.sigmoid(comp_dict["w"]), dim = -1), min = 0, max = 1)
-    tau = tau * no_contact_fac[:, None]
-    return comp_dict["des_pos"], tau 
+    return comp_dict["des_pos"], tau
 
 try:
     jit_step = torch.compile(step)
@@ -317,7 +321,7 @@ def ft_rew_info(com_pos, com_vel,
         base_quat, base_angvel,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
         comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
-        com_vel
+        com_vel, comp_dict["w"]
     )
 
     idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
