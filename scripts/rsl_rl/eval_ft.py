@@ -7,6 +7,7 @@ import sys
 import numpy as np
 
 from isaaclab.app import AppLauncher
+
 # local imports
 import cli_args  # isort: skip
 
@@ -111,11 +112,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
 
     # create isaac environment
-    if args_cli.task == "Tracking-FT-T1-v0":
-        env_cfg.decimation = 10
-        env_cfg.sim.dt = 0.02 / 10
-    env_cfg.decimation = 10
-    env_cfg.sim.dt = 0.02 / 10
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
 
     log_dir = os.path.dirname(resume_path)
@@ -157,98 +153,41 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     )
     attach_onnx_metadata(env.unwrapped, args_cli.wandb_path if args_cli.wandb_path else "none", export_model_dir)
     # reset environment
-    obs = env.get_observations()
+    obs, _ = env.get_observations()
     #obs, _ = env.get_observations()
     timestep = 0
     # simulate environment
-    # Simulate for 700 timesteps
-    if args_cli.task == "Tracking-FT-T1-v0":
-        eval_name = "eval_data/ft_eval_data.npz"
-    else:
-        eval_name = "eval_data/pd_eval_data.npz"
-
-    iters = 1
-
-    duration = 200
-
-    terminated = np.zeros((iters, env_cfg.scene.num_envs, duration), dtype=bool)
-    root_vel_error = np.zeros((iters, env_cfg.scene.num_envs, duration))
-    root_vel = np.zeros((iters, env_cfg.scene.num_envs, duration))
-    forces = np.zeros((iters,))
-
-    for i in range(iters):
-        print(f"[INFO] Starting eval iteration {i+1}/{iters}")
+    save_dict = None
+    for c in range(600):
+        # run everything in inference mode
         with torch.inference_mode():
-            obs, _ = env.reset()
-        force_mag = i * 100 + 700.0
-        forces[i] = force_mag
-        for c in range(duration):
-            # run everything in inference mode
-            set_random_force(env.unwrapped, c, force_mag)
-            with torch.inference_mode():
-                # agent stepping
-                actions = policy(obs)
-                if actions.ndim == 1:
-                    actions = torch.reshape(actions, (1, -1))
-                # env stepping
-                obs, _, terminated_, _ = env.step(actions)
-                terminated[i, :, c] = terminated_.cpu().numpy()
-                vel_error = motion_global_anchor_velocity_error(env)
-                vel = root_velocity(env)
-                root_vel_error[i, :, c] = vel_error.cpu().numpy()
-                root_vel[i, :, c] = vel.cpu().numpy()
-            if args_cli.video:
-                timestep += 1
-                # Exit the play loop after recording one video
-                if timestep == args_cli.video_length:
-                    break
-
-    # Save the eval data
-    np.savez(eval_name, **{"terminated": terminated,
-                           "root_vel_error": root_vel_error,
-                           "root_vel": root_vel,
-                           "forces": forces})
+            # agent stepping
+            actions = policy(obs)
+            if actions.ndim == 1:
+                actions = torch.reshape(actions, (1, -1))
+            # env stepping
+            obs, _, _, _ = env.step(actions)
+            data_dict = env.unwrapped.ft_rew_info["debug"]
+            if save_dict is None:
+                save_dict = {}
+                for k in data_dict.keys():
+                    save_dict[k] = np.zeros(
+                        (600, data_dict[k].cpu().numpy().shape[0],
+                        data_dict[k].cpu().numpy().shape[1],)
+                    )
+            for k in data_dict.keys():
+                print(k, data_dict[k].cpu().numpy().shape)
+                save_dict[k][c, :, :] = data_dict[k].cpu().numpy()
+        if args_cli.video:
+            timestep += 1
+            # Exit the play loop after recording one video
+            if timestep == args_cli.video_length:
+                break
+    eval_name = "eval_data/ft_debug_data.npz"
+    np.savez(eval_name, **save_dict)
     # close the simulator
     env.close()
 
-def motion_global_anchor_velocity_error(env) -> torch.Tensor:
-    command = env.unwrapped.command_manager.get_term("motion")
-    error = torch.sum(
-        torch.square(command.body_lin_vel_w[:, 0] - command.robot_body_lin_vel_w[:, 0]), dim=-1
-    )
-    return torch.sqrt(error)
-
-def root_velocity(env) -> torch.Tensor:
-    command = env.unwrapped.command_manager.get_term("motion")
-    vel = torch.sum(
-        torch.square(command.robot_body_lin_vel_w[:, 0]), dim=-1
-    )
-    return torch.sqrt(vel)
-
-def set_random_force(env, step, frc_mag):
-
-    num_envs = env.num_envs
-    # apply random impulse forces to the robot at if timestep meets threshold
-    # round(sin(env_num / 6) * 100 + 150 ) == step
-    frc_mask = torch.arange(num_envs, device=env.device)
-    frc_mask = torch.round(torch.sin(frc_mask / 6) * 25 + 100).to(torch.int64)
-    
-    frc = torch.randn((num_envs, 3), device=env.device)
-    frc = frc * frc_mag / torch.linalg.norm(frc, dim=-1, keepdim=True)
-
-    frc = torch.where(frc_mask[:, None] == step, frc, torch.zeros_like(frc))
-
-    robot = env.scene["robot"]
-    num_bodies = robot.num_bodies
-    forces_b = torch.zeros((num_envs, 1, 3), device=env.device)
-    torques_b = torch.zeros((num_envs, 1, 3), device=env.device)
-    forces_b[:, 0, :] = frc  # apply to base link
-
-    body_ids = torch.arange(num_bodies, device=env.device)
-
-    robot.set_external_force_and_torque(forces = forces_b, torques = torques_b, body_ids = [0], is_global = True)
-
-    return
 
 if __name__ == "__main__":
     # run the main function

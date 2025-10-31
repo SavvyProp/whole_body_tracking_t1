@@ -37,9 +37,22 @@ def model_based_controller(robot, action):
     return pos, ff_torque
 
 def make_ft_rew_dict(robot, action):
-    joint_vel = robot.data.joint_vel.clone()  # (N, num_joints)
+    body_pos_w = robot.data.body_pos_w
 
-    return ft.ft_rew_info(joint_vel, action)
+    jacs = robot.root_physx_view.get_jacobians()
+    # Base position (world): pos (3) + quat (4)
+    
+    base_quat = robot.data.root_link_quat_w  # (N, 3)
+
+    joint_vel = robot.data.joint_vel  # (N, num_joints)
+
+    base_angvel = robot.data.root_com_ang_vel_b
+
+    com_pos = robot.data.root_link_pos_w  # (N, 3)
+    com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
+
+    return ft.ft_rew_info(com_pos, com_vel, jacs, body_pos_w, 
+                             base_quat, base_angvel, joint_vel, action)
 
 class FTActionManager(ActionManager):
     @property
@@ -137,7 +150,7 @@ class FTEnv(ManagerBasedRLEnv):
 
         with torch.no_grad():
             action_ = action.clone()
-            self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], action_)
+            self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], self.action_manager._action)
 
         # perform physics stepping
         for i in range(self.cfg.decimation):

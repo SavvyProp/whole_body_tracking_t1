@@ -233,7 +233,7 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
     return sol
 
 def ft_ref(
-    eefpos, com_pos, jacs, tau_ref, com_ref, w
+    eefpos, com_pos, jacs, tau_ref, com_ref, w, debug = False
 ):
     weights = torch.tensor([1e-3, 1e-2], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
@@ -253,6 +253,8 @@ def ft_ref(
     f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
     tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
+    if debug:
+        return tau, f
     return tau.squeeze(-1)
 
 def highlvlPD(base_quat, base_angvel, 
@@ -302,8 +304,37 @@ try:
 except Exception as _e:
     print("[INFO] torch.compile disabled; using eager mode:", _e)
 
-def ft_rew_info(joint_vel, action):
+def ft_rew_info(com_pos, com_vel,
+         jacs,
+         eefpos,
+         base_quat, base_angvel, joint_vel,
+         action):
+    logits = ctrl2logits(action)
+    comp_dict = ctrl2components(action, joint_vel)
+    com_acc, ang_acc = highlvlPD(
+        base_quat, base_angvel,
+        comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
+        comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
+        com_vel
+    )
+
+    idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
+    selected_jacs = jacs.index_select(1, idx)                 # (N, EEF_NUM, 6, D)
+    jacs_ = selected_jacs.reshape(selected_jacs.size(0), -1, selected_jacs.size(-1))  # (N, 6*EEF_NUM, D)
+    eefpos_ = eefpos.index_select(1, idx)                 # (N, EEF_NUM, 3)
+    tau, f = ft_ref(
+        eefpos_, com_pos, jacs_,
+        comp_dict["torque"],
+        torch.cat([com_acc, ang_acc], dim=-1),
+        comp_dict["w"], debug=True
+    )
+    debug_dict = {
+        "ff_tau": tau.reshape(-1, CTRL_NUM),
+        "f": f,
+        "des_pos": logits["des_pos"],
+    }
     return {
+        "debug": debug_dict,
         "logits": ctrl2logits(action),
         "components": ctrl2components(action, joint_vel)
     }
