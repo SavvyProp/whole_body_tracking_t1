@@ -131,7 +131,7 @@ def ft_force_correctness(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> 
 
 def ft_tau_ref(env: ManagerBasedRLEnv) -> torch.Tensor:
     applied_torque = env.scene["robot"].data.applied_torque
-    tau_ref = env.ft_rew_info["components"]["torque"]
+    tau_ref = env.ft_rew_info["components"]["torque"][0, :, :]
     # Reward for minimizing error between applied torque and tau_ref
     frc_err = torch.sum(torch.square(applied_torque - tau_ref), dim=-1)
     sigma = 50
