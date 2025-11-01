@@ -267,11 +267,11 @@ class RewardsCfg:
             ),
         }
     )
-    #centroid_vel = RewTerm(
-    #    func=mdp.centroid_velocity,
-    #    weight=0.1,
-    #    params = {}
-    #)
+    centroid_vel = RewTerm(
+        func=mdp.centroid_velocity,
+        weight=0.1,
+        params = {}
+    )
 
 
 @configclass
