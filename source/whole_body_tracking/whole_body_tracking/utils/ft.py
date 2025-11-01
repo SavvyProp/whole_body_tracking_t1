@@ -252,10 +252,23 @@ def ft_ref(
 
     f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
-    tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
+    candidate_tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
+    candidate_tau = candidate_tau.squeeze(-1)
+
+    t = torch.where(candidate_tau > TORQUE_LIMITS[None, :],
+                    TORQUE_LIMITS[None, :], -TORQUE_LIMITS[None, :])
+    d = (t - tau_ref) / (candidate_tau - tau_ref)
+    scaling_fac = torch.clamp(d, min=0.0, max=1.0)
+    scaling_fac = torch.where(candidate_tau.abs() <= TORQUE_LIMITS[None, :],
+                              1.0, scaling_fac)
+
+    min_scaling_fac, _ = torch.min(scaling_fac, dim = -1, keepdim = True)
+    tau = tau_ref * (1 - min_scaling_fac) + candidate_tau * min_scaling_fac
+    
+
     if debug:
         return tau, f
-    return tau.squeeze(-1)
+    return tau
 
 def highlvlPD(base_quat, base_angvel, 
               lin_gain, angvel_gain,
@@ -299,8 +312,8 @@ def step(com_pos, com_vel,
         torch.cat([com_acc, ang_acc], dim=-1),
         comp_dict["w"]
     )
-    torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
-    tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
+    #torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
+    #tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
     return comp_dict["des_pos"], tau
 
 try:
