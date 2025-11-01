@@ -279,10 +279,10 @@ def highlvlPD(base_quat, base_angvel,
     q_wb = base_quat
     global_des_vel = quat_apply(q_wb, des_vel)
 
-    com_acc = lin_gain[:, None] * (global_des_vel - com_vel)
+    com_acc = lin_gain * (global_des_vel - com_vel)
 
     com_angvel = base_angvel
-    ang_acc = angvel_gain[:, None] * (des_angvel - com_angvel)
+    ang_acc = angvel_gain * (des_angvel - com_angvel)
 
     return com_acc, ang_acc
 
