@@ -272,11 +272,6 @@ class RewardsCfg:
         weight=0.1,
         params = {}
     )
-    torque_select = RewTerm(
-        func=mdp.ft_torque_select,
-        weight=0.1,
-        params = {}
-    )
 
 
 @configclass
