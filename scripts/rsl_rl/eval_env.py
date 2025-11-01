@@ -167,7 +167,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     else:
         eval_name = "eval_data/pd_eval_data.npz"
 
-    iters = 4
+    iters = 8
 
     duration = 400
 
@@ -180,7 +180,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print(f"[INFO] Starting eval iteration {i+1}/{iters}")
         with torch.inference_mode():
             obs, _ = env.reset()
-        force_mag = i * 100 + 500.0
+        force_mag = i * 100 + 300.0
         forces[i] = force_mag
         for c in range(duration):
             # run everything in inference mode
@@ -231,7 +231,7 @@ def set_random_force(env, step, frc_mag):
     # apply random impulse forces to the robot at if timestep meets threshold
     # round(sin(env_num / 6) * 100 + 150 ) == step
     frc_mask = torch.arange(num_envs, device=env.device)
-    frc_mask = torch.round(torch.sin(frc_mask / 6) * 50 + 200).to(torch.int64)
+    frc_mask = torch.round(torch.sin(frc_mask / 6) * 75 + 100).to(torch.int64)
     
     frc = torch.randn((num_envs, 3), device=env.device)
     frc = frc * frc_mag / torch.linalg.norm(frc, dim=-1, keepdim=True)

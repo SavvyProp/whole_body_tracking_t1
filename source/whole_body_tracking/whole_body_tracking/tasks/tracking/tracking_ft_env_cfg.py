@@ -254,7 +254,7 @@ class RewardsCfg:
     )
     contact_ft = RewTerm(
         func=mdp.contact_state,
-        weight=-1.0,
+        weight=-0.5,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
@@ -271,6 +271,21 @@ class RewardsCfg:
         func=mdp.centroid_velocity,
         weight=0.1,
         params = {}
+    )
+    force_correctness = RewTerm(
+        func=mdp.ft_force_correctness,
+        weight=0.25,
+        params={
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=[
+                    "left_hand_link",
+                    "right_hand_link",
+                    "left_foot_link",
+                    "right_foot_link",
+                ],
+            ),
+        }
     )
 
 

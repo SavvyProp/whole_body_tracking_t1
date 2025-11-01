@@ -116,3 +116,15 @@ def ft_torque_select(env: ManagerBasedRLEnv) -> torch.Tensor:
     torque_select = env.ft_rew_info["components"]["torque_select"]
     l2_err = torch.sum( torque_select, dim= -1)
     return l2_err / 23
+
+def ft_force_correctness(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    net_forces_w = contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids]
+    pred_force = env.ft_rew_info["debug"]["f"]
+    num_eef = pred_force.shape[1] // 6
+    pred_force = pred_force.reshape(pred_force.shape[0], num_eef, 6)
+    pred_lin_force = pred_force[:, :, :3]
+    force_err = torch.sum(torch.square(net_forces_w - pred_lin_force), dim=-1)  # (N, EEF_NUM)
+    sigma = 240.0
+    exp_err = torch.exp(-torch.sum(force_err, dim = -1) / (sigma ** 2))
+    return exp_err

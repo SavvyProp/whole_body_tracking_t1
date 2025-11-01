@@ -254,6 +254,10 @@ def ft_ref(
 
     f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
+    contact_fac = torch.sigmoid(w)
+    scale = contact_fac.repeat_interleave(6, dim=-1)  # (N, 6*EEF_NUM)
+    f = f * scale 
+
     candidate_tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
 
@@ -276,9 +280,6 @@ def highlvlPD(base_quat, base_angvel,
               lin_gain, angvel_gain,
               des_vel, des_angvel,
               com_vel, w):
-    default_acc = torch.tensor([0, 0, -9.81], device=base_quat.device)
-    default_angacc = torch.tensor([0, 0, 0], device=base_quat.device)
-    num_contacts = torch.clamp(torch.sum(torch.sigmoid(w * 2), axis = -1), min = 0.0, max = 1.0)
     q_wb = base_quat
     global_des_vel = quat_apply(q_wb, des_vel)
 
@@ -287,8 +288,6 @@ def highlvlPD(base_quat, base_angvel,
     com_angvel = base_angvel
     ang_acc = angvel_gain[:, None] * (des_angvel - com_angvel)
 
-    com_acc = com_acc * (1.0 - num_contacts[:, None]) + default_acc[None, :] * num_contacts[:, None]
-    ang_acc = ang_acc * (1.0 - num_contacts[:, None]) + default_angacc[None, :] * num_contacts[:, None]
     return com_acc, ang_acc
 
 def step(com_pos, com_vel,
