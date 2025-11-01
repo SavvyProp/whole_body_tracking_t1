@@ -25,18 +25,14 @@ EEF_IDS = [bodies.index(name) for name in EEF_BODIES]
 def ctrl2logits(act):
     des_pos = act[:, 0:CTRL_NUM]
     des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3]
-    des_com_angvel = act[:, CTRL_NUM + 3 : CTRL_NUM + 6]
-    w = act[:, CTRL_NUM + 6 : CTRL_NUM + EEF_NUM + 6]
-    torque = act[:, CTRL_NUM + EEF_NUM + 6:
-              CTRL_NUM * 2 + EEF_NUM + 6]
-    d_gain = act[:, -2:]
+    w = act[:, CTRL_NUM + 3 : CTRL_NUM + EEF_NUM + 3]
+    torque = act[:, CTRL_NUM + EEF_NUM + 3:
+              CTRL_NUM * 2 + EEF_NUM + 3]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
-        "des_com_angvel": des_com_angvel,
         "w": w,
         "torque": torque,
-        "d_gain": d_gain
     }
     return logits
 
@@ -44,7 +40,7 @@ def ctrl2components(act, joint_vel):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
 
-    des_angvel = logits["des_com_angvel"] * 0.20
+    des_angvel = torch.zeros(des_pos.shape[0], 3, device=des_pos.device)
     #des_angvel_mag = torch.norm(des_angvel, dim =-1, keepdim=True)
     #des_angvel_mag_clipped = torch.clamp(des_angvel_mag, max = 2.0)
     #des_angvel = des_angvel * (des_angvel_mag_clipped / (1e-6 + des_angvel_mag))
@@ -65,9 +61,9 @@ def ctrl2components(act, joint_vel):
     sign = torch.where(joint_vel * torque_logit >= 0, 1.0, 0.0)
     tau = tau_naive * (1.0 - spd_fac[None, :] * sign)
 
-    d_gain_lin = torch.tanh(logits["d_gain"][:, 0]) * 3.0 + 4.0
+    d_gain_lin = 5.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = torch.tanh(logits["d_gain"][:, 1]) * 0.10 + 0.11
+    d_gain_angvel = 0.10
 
     return {
         "des_pos": des_pos,

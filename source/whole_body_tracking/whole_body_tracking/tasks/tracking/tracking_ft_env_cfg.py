@@ -274,7 +274,7 @@ class RewardsCfg:
     )
     force_correctness = RewTerm(
         func=mdp.ft_force_correctness,
-        weight=0.25,
+        weight=0.15,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
@@ -286,6 +286,12 @@ class RewardsCfg:
                 ],
             ),
         }
+    )
+
+    tau_ref = RewTerm(
+        func=mdp.ft_tau_ref
+        weight=0.1,
+        params = {}
     )
 
 

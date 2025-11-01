@@ -51,14 +51,16 @@ def make_ft_rew_dict(robot, action):
     com_pos = robot.data.root_link_pos_w  # (N, 3)
     com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
 
-    return ft.ft_rew_info(com_pos, com_vel, jacs, body_pos_w, 
+    ft_rew_dict = ft.ft_rew_info(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
+    
+    return ft_rew_dict
 
 class FTActionManager(ActionManager):
     @property
     def total_action_dim(self) -> int:
         """Total action dimension."""
-        return 58
+        return 53
     
     def process_action(self, action: torch.Tensor):
         if self.total_action_dim != action.shape[1]:

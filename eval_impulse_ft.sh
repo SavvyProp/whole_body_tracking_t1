@@ -1,1 +1,1 @@
-python scripts/rsl_rl/eval_env.py --task=Tracking-FT-T1-v0 --num_envs=36 --wandb_path=ludwigtaycheeying-purdue-university/t1ft_agile/vslxtq6h
+python scripts/rsl_rl/eval_env.py --task=Tracking-FT-T1-v0 --num_envs=36 --wandb_path=ludwigtaycheeying-purdue-university/t1ft_agile/kccditjh
