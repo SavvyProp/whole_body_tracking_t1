@@ -29,6 +29,8 @@ def ctrl2logits(act):
     w = act[:, CTRL_NUM + 6 : CTRL_NUM + EEF_NUM + 6]
     torque = act[:, CTRL_NUM + EEF_NUM + 6:
               CTRL_NUM * 2 + EEF_NUM + 6]
+    torque_select = act[:, CTRL_NUM * 2 + EEF_NUM + 6:
+              CTRL_NUM * 3 + EEF_NUM + 6]
     d_gain = act[:, -2:]
     logits = {
         "des_pos": des_pos,
@@ -36,6 +38,7 @@ def ctrl2logits(act):
         "des_com_angvel": des_com_angvel,
         "w": w,
         "torque": torque,
+        "torque_select": torque_select,
         "d_gain": d_gain
     }
     return logits
@@ -74,7 +77,8 @@ def ctrl2components(act, joint_vel):
         "w": w,
         "torque": tau,
         "d_gain_lin": d_gain_lin,
-        "d_gain_angvel": d_gain_angvel
+        "d_gain_angvel": d_gain_angvel,
+        "torque_select": torch.sigmoid(logits["torque_select"])
     }
 
 def make_centroidal_ag(
@@ -347,6 +351,7 @@ def ft_rew_info(com_pos, com_vel,
         torch.cat([com_acc, ang_acc], dim=-1),
         comp_dict["w"], debug=True
     )
+    tau = tau * comp_dict["torque_select"]
     debug_dict = {
         "ff_tau": tau.reshape(-1, CTRL_NUM),
         "f": f,

@@ -101,7 +101,6 @@ def centroid_velocity(env: ManagerBasedRLEnv):
     linvel_rew = torch.exp(-lse / 0.25)
     return linvel_rew
 
-
 def ft_action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the rate of change of the actions using L2 squared kernel."""
     pos_component = env.action_manager.action[:, :23]
@@ -110,4 +109,10 @@ def ft_action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     remaining_prev = env.action_manager.prev_action[:, 23:]
     pos_l2_err = torch.sum(torch.square(pos_component - pos_prev), dim=1)
     remaining_l2_err = torch.sum(torch.square(remaining_component - remaining_prev), dim=1)
-    return pos_l2_err + remaining_l2_err * 0.05
+    return pos_l2_err + remaining_l2_err * 0.10
+
+def ft_torque_select(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Encourage the torque selection values to be close to 0 or 1."""
+    torque_select = env.ft_rew_info["components"]["torque_select"]
+    l2_err = torch.sum( torque_select, dim= -1)
+    return l2_err / 23
