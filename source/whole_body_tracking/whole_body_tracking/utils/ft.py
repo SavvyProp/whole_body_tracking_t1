@@ -17,8 +17,8 @@ ANGULAR_INERTIA = torch.tensor(
  [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]], device = "cuda")
 INV_ANGULAR_INERTIA = torch.linalg.inv(ANGULAR_INERTIA)
 
-#EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
-EEF_BODIES = ['AL2', 'AR2', 'AL3', 'AR3', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
+EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
+#EEF_BODIES = ['AL2', 'AR2', 'AL3', 'AR3', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
 EEF_NUM = len(EEF_BODIES)
 
 EEF_IDS = [bodies.index(name) for name in EEF_BODIES]
