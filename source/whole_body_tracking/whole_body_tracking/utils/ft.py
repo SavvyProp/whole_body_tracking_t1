@@ -31,12 +31,14 @@ def ctrl2logits(act):
               CTRL_NUM * 2 + EEF_NUM + 3]
     des_com_angvel = act[:, CTRL_NUM * 2 + EEF_NUM + 3:
                 CTRL_NUM * 2 + EEF_NUM + 6]
+    uc_w = act[:, -1]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
         "des_com_angvel": des_com_angvel,
         "w": w,
         "torque": torque,
+        "uc_w": uc_w
     }
     return logits
 
@@ -77,7 +79,8 @@ def ctrl2components(act, joint_vel):
         "w": w,
         "torque": tau,
         "d_gain_lin": d_gain_lin,
-        "d_gain_angvel": d_gain_angvel
+        "d_gain_angvel": d_gain_angvel,
+        "uc_w": logits["uc_w"]
     }
 
 def make_centroidal_ag(
@@ -236,8 +239,24 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
     return sol
 
 def ft_ref(
-    eefpos, com_pos, jacs, tau_ref, com_ref, w, debug = False
+    eefpos, com_pos, jacs, tau_ref, com_ref, w, uc_w, debug = False
 ):
+    # Concat the unaccounted force component
+    unaccounted_weight = torch.exp(torch.clamp(uc_w, min=-6.0, max=6.0))  # (N,)
+    ctrl_num = tau_ref.shape[-1]
+    unaccounted_jac = torch.zeros(
+        jacs.shape[0], 6, ctrl_num + 6
+    )
+    jacs = torch.cat([unaccounted_jac, jacs], dim = 1)
+    #unaccounted_pos = com_pos
+    eefpos = torch.cat([
+        com_pos[:, None, :], eefpos
+    ], dim = 1)
+
+    w = torch.cat([
+        unaccounted_weight[:, None], w
+    ], dim = 1)
+
     weights = torch.tensor([1e-3, 1e-2], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
@@ -249,29 +268,33 @@ def ft_ref(
     qp_q += jt_q_big
     qp_c = jt_q_small * weights[1]
 
+    # Add additional optimization term for unaccounted forces
+    # e^x weight.
+
     # Make constraints
 
     cons_lhs, cons_rhs = centroidal_qacc_cons(a, g, com_ref)
 
     f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
-    contact_fac = torch.sigmoid(w)
-    scale = contact_fac.repeat_interleave(6, dim=-1)  # (N, 6*EEF_NUM)
-    f = f * scale 
+    #contact_fac = torch.sigmoid(w)
+    #scale = contact_fac.repeat_interleave(6, dim=-1)  # (N, 6*EEF_NUM)
+    #f = f * scale 
 
     candidate_tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
 
-    t = torch.where(candidate_tau > TORQUE_LIMITS[None, :],
-                    TORQUE_LIMITS[None, :], -TORQUE_LIMITS[None, :])
-    d = (t - tau_ref) / (candidate_tau - tau_ref)
-    scaling_fac = torch.clamp(d, min=0.0, max=1.0)
-    scaling_fac = torch.where(candidate_tau.abs() <= TORQUE_LIMITS[None, :],
-                              1.0, scaling_fac)
+    #t = torch.where(candidate_tau > TORQUE_LIMITS[None, :],
+    #                TORQUE_LIMITS[None, :], -TORQUE_LIMITS[None, :])
+    #d = (t - tau_ref) / (candidate_tau - tau_ref)
+    #scaling_fac = torch.clamp(d, min=0.0, max=1.0)
+    #scaling_fac = torch.where(candidate_tau.abs() <= TORQUE_LIMITS[None, :],
+    #                          1.0, scaling_fac)
 
-    min_scaling_fac, _ = torch.min(scaling_fac, dim = -1, keepdim = True)
-    tau = tau_ref * (1 - min_scaling_fac) + candidate_tau * min_scaling_fac
-    
+    #min_scaling_fac, _ = torch.min(scaling_fac, dim = -1, keepdim = True)
+    #tau = tau_ref * (1 - min_scaling_fac) + candidate_tau * min_scaling_fac
+    tau = torch.clamp(candidate_tau, min=-TORQUE_LIMITS[None, :], max=TORQUE_LIMITS[None, :])
+    f = f[:, 6:] # remove unaccounted force
 
     if debug:
         return tau, f
@@ -313,7 +336,8 @@ def step(com_pos, com_vel,
         eefpos_, com_pos, jacs_,
         comp_dict["torque"],
         torch.cat([com_acc, ang_acc], dim=-1),
-        comp_dict["w"]
+        comp_dict["w"],
+        comp_dict["uc_w"]
     )
     #torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
     #tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
@@ -348,7 +372,8 @@ def ft_rew_info(com_pos, com_vel,
         eefpos_, com_pos, jacs_,
         comp_dict["torque"],
         torch.cat([com_acc, ang_acc], dim=-1),
-        comp_dict["w"], debug=True
+        comp_dict["w"],
+        comp_dict["uc_w"], debug=True
     )
     debug_dict = {
         "ff_tau": tau.reshape(-1, CTRL_NUM),
