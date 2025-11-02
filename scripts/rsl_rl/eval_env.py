@@ -180,7 +180,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print(f"[INFO] Starting eval iteration {i+1}/{iters}")
         with torch.inference_mode():
             obs, _ = env.reset()
-        force_mag = i * 100 + 300.0
+        force_mag = (i**1.5) * 100 + 300.0
         forces[i] = force_mag
         for c in range(duration):
             # run everything in inference mode

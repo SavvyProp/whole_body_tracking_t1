@@ -5,7 +5,6 @@ bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_L
 joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 'Head_pitch', 'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 'Left_Hip_Pitch', 'Right_Hip_Pitch', 'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 'Left_Hip_Roll', 'Right_Hip_Roll', 'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 'Left_Hip_Yaw', 'Right_Hip_Yaw', 'Left_Knee_Pitch', 'Right_Knee_Pitch', 'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 'Left_Ankle_Roll', 'Right_Ankle_Roll']
 
 CTRL_NUM = 23
-EEF_NUM = 4
 
 TORQUE_LIMITS = torch.tensor([
     7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 30, 30, 18, 18, 30, 30, 60, 60, 20, 20, 15, 15
@@ -18,7 +17,9 @@ ANGULAR_INERTIA = torch.tensor(
  [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]], device = "cuda")
 INV_ANGULAR_INERTIA = torch.linalg.inv(ANGULAR_INERTIA)
 
-EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
+#EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
+EEF_BODIES = ['AL2', 'AR2', 'AL3', 'AR3', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
+EEF_NUM = len(EEF_BODIES)
 
 EEF_IDS = [bodies.index(name) for name in EEF_BODIES]
 

@@ -1,1 +1,1 @@
-python scripts/rsl_rl/eval_env.py --task=Tracking-Flat-T1-v0 --num_envs=36 --wandb_path=ludwigtaycheeying-purdue-university/t1_flat/jt7b3x4y
+python scripts/rsl_rl/eval_env.py --task=Tracking-Flat-T1-v0 --num_envs=36 --wandb_path=ludwigtaycheeying-purdue-university/t1_flat/d5lf7doq --headless

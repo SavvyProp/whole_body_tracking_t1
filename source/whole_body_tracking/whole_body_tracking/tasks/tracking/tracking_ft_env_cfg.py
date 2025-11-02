@@ -22,6 +22,7 @@ from isaaclab.utils import configclass
 from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 import whole_body_tracking.tasks.tracking.mdp as mdp
+from whole_body_tracking.utils.ft import EEF_BODIES
 
 ##
 # Scene definition
@@ -241,7 +242,7 @@ class RewardsCfg:
     )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-0.1,
+        weight=0.0,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
@@ -258,12 +259,7 @@ class RewardsCfg:
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
-                body_names=[
-                    "left_hand_link",
-                    "right_hand_link",
-                    "left_foot_link",
-                    "right_foot_link",
-                ],
+                body_names=EEF_BODIES
             ),
         }
     )
@@ -283,12 +279,7 @@ class RewardsCfg:
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
-                body_names=[
-                    "left_hand_link",
-                    "right_hand_link",
-                    "left_foot_link",
-                    "right_foot_link",
-                ],
+                body_names=EEF_BODIES
             ),
         }
     )
