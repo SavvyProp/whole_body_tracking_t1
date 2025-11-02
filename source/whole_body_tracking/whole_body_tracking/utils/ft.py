@@ -89,7 +89,7 @@ def make_centroidal_ag(
     r = eefpos - com_pos[:, None, :]
     f_blocks = []
     batch_invI = INV_ANGULAR_INERTIA.expand(r.shape[0], -1, -1)  # (N,3,3)
-    for i in range(EEF_NUM):
+    for i in range(EEF_NUM + 1):
         v = r[:, i, :]  # (N, 3)
         S = torch.zeros(v.shape[0], 3, 3, device=v.device, dtype=v.dtype)
         S[:, 0, 1] = -v[:, 2]; S[:, 0, 2] =  v[:, 1]
