@@ -113,10 +113,10 @@ def f_mag_q(w):
     scale_lin = torch.exp(logits)                        # (N, EEF_NUM)
     scale_ang = scale_lin * 40.0                         # (N, EEF_NUM)
 
-    F_size = EEF_NUM * 6
+    F_size = (EEF_NUM + 1) * 6
     qp_q = torch.eye(F_size, device=w.device, dtype=w.dtype).unsqueeze(0).expand(w.shape[0], -1, -1).clone()
 
-    for i in range(EEF_NUM):
+    for i in range(EEF_NUM + 1):
         r0 = i * 6
         r3 = r0 + 3
         r6 = r0 + 6
