@@ -1,5 +1,6 @@
 import torch
 from isaaclab.utils.math import quat_apply
+from torch._dynamo import disable
 
 bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
 joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 'Head_pitch', 'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 'Left_Hip_Pitch', 'Right_Hip_Pitch', 'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 'Left_Hip_Roll', 'Right_Hip_Roll', 'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 'Left_Hip_Yaw', 'Right_Hip_Yaw', 'Left_Knee_Pitch', 'Right_Knee_Pitch', 'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 'Left_Ankle_Roll', 'Right_Ankle_Roll']
@@ -83,27 +84,51 @@ def ctrl2components(act, joint_vel):
         "uc_w": logits["uc_w"]
     }
 
-def make_centroidal_ag(
-    eefpos, com_pos
-):
-    r = eefpos - com_pos[:, None, :]
-    f_blocks = []
-    batch_invI = INV_ANGULAR_INERTIA.expand(r.shape[0], -1, -1)  # (N,3,3)
-    for i in range(eefpos.shape[1]):
-        v = r[:, i, :]  # (N, 3)
-        S = torch.zeros(v.shape[0], 3, 3, device=v.device, dtype=v.dtype)
-        S[:, 0, 1] = -v[:, 2]; S[:, 0, 2] =  v[:, 1]
-        S[:, 1, 0] =  v[:, 2]; S[:, 1, 2] = -v[:, 0]
-        S[:, 2, 0] = -v[:, 1]; S[:, 2, 1] =  v[:, 0]
-        f_top = torch.cat([
-            torch.eye(3, device=v.device, dtype=v.dtype) / MASS,
-            torch.zeros((3, 3), device=v.device, dtype=v.dtype)
-        ], dim=1)  # (N, 3, 6)
-        f_top = f_top.expand(v.shape[0], -1, -1)
-        f_bot = torch.cat([batch_invI @ S, batch_invI], dim=2)
-        f_block = torch.cat([f_top, f_bot], dim=1)  # (N, 6,6)
-        f_blocks.append(f_block)
-    a = torch.cat(f_blocks, dim=2)  # (N, 6, 6*EEF_NUM or 6*(EEF_NUM+1))
+def make_centroidal_ag(eefpos, com_pos):
+    """
+    Vectorized version of make_centroidal_ag without Python loops.
+
+    Args:
+      eefpos: (N, E, 3)
+      com_pos:(N, 3)
+
+    Returns:
+      a: (N, 6, 6*E)
+      g: (6,)
+    """
+    r = eefpos - com_pos[:, None, :]  # (N, E, 3)
+    N, E, _ = r.shape
+    device, dtype = r.device, r.dtype
+
+    # Skew-symmetric matrices S(r) for all effectors: (N, E, 3, 3)
+    rx, ry, rz = r.unbind(-1)
+    S = torch.zeros(N, E, 3, 3, device=device, dtype=dtype)
+    S[..., 0, 1] = -rz
+    S[..., 0, 2] =  ry
+    S[..., 1, 0] =  rz
+    S[..., 1, 2] = -rx
+    S[..., 2, 0] = -ry
+    S[..., 2, 1] =  rx
+
+    # invI: (N, 1, 3, 3) broadcast over E
+    invI = INV_ANGULAR_INERTIA.to(device=device, dtype=dtype).expand(N, -1, -1).unsqueeze(1)
+
+    # Bottom block per effector: [invI @ S, invI] -> (N, E, 3, 6)
+    bot_left = invI @ S                         # (N, E, 3, 3)
+    bot_right = invI.expand(N, E, 3, 3)         # (N, E, 3, 3)
+    f_bot = torch.cat([bot_left, bot_right], dim=-1)  # (N, E, 3, 6)
+
+    # Top block per effector: [I/M, 0] -> (N, E, 3, 6)
+    I3 = torch.eye(3, device=device, dtype=dtype)
+    f_top_base = torch.cat([I3 / MASS, torch.zeros_like(I3)], dim=-1)  # (3, 6)
+    f_top = f_top_base.view(1, 1, 3, 6).expand(N, E, 3, 6)
+
+    # Full per-effector 6x6 block: (N, E, 6, 6)
+    f_block = torch.cat([f_top, f_bot], dim=-2)  # (N, E, 6, 6)
+
+    # Concatenate horizontally across effectors: (N, 6, 6*E)
+    a = f_block.permute(0, 2, 1, 3).reshape(N, 6, E * 6)
+
     g = eefpos.new_tensor([0.0, 0.0, -9.81, 0.0, 0.0, 0.0])  # (6,)
     return a, g
 
@@ -242,22 +267,21 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
 jit_schur_solve = torch.compile(schur_solve)
 
 def ft_ref(
-    eefpos, com_pos, jacs, tau_ref, com_ref, w, uc_w, debug = False
+    eefpos_, com_pos, jacs_, tau_ref, com_ref, w_, uc_w, debug = False
 ):
     # Concat the unaccounted force component
     unaccounted_weight = torch.exp(torch.clamp(uc_w, min=-6.0, max=6.0))  # (N,)
     ctrl_num = tau_ref.shape[-1]
     unaccounted_jac = torch.zeros(
-        (jacs.shape[0], 6, ctrl_num + 6), device = jacs.device, dtype = jacs.dtype
+        (jacs_.shape[0], 6, ctrl_num + 6), device = jacs_.device
     )
-    jacs = torch.cat([unaccounted_jac, jacs], dim = 1)
-    unaccounted_pos = com_pos
+    jacs = torch.cat([unaccounted_jac, jacs_], dim = 1)
     eefpos = torch.cat([
-        com_pos[:, None, :], eefpos
+        com_pos[:, None, :], eefpos_
     ], dim = 1)
 
     w = torch.cat([
-        unaccounted_weight, w
+        unaccounted_weight, w_
     ], dim = 1)
 
     weights = torch.tensor([1e-3, 1e-2], device=eefpos.device)
@@ -278,7 +302,7 @@ def ft_ref(
 
     cons_lhs, cons_rhs = centroidal_qacc_cons(a, g, com_ref)
 
-    f = jit_schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
+    f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
     #contact_fac = torch.sigmoid(w)
     #scale = contact_fac.repeat_interleave(6, dim=-1)  # (N, 6*EEF_NUM)
@@ -347,7 +371,7 @@ def step(com_pos, com_vel,
     return comp_dict["des_pos"], tau
 
 try:
-    jit_step = torch.compile(step, backend="eager")
+    jit_step = torch.compile(step)
     # You can also compile other hot helpers if desired:
     # ft_ref = torch.compile(ft_ref, mode="max-autotune", fullgraph=False)
 except Exception as _e:
