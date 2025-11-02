@@ -28,9 +28,12 @@ def ctrl2logits(act):
     w = act[:, CTRL_NUM + 3 : CTRL_NUM + EEF_NUM + 3]
     torque = act[:, CTRL_NUM + EEF_NUM + 3:
               CTRL_NUM * 2 + EEF_NUM + 3]
+    des_com_angvel = act[:, CTRL_NUM * 2 + EEF_NUM + 3:
+                CTRL_NUM * 2 + EEF_NUM + 6]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
+        "des_com_angvel": des_com_angvel,
         "w": w,
         "torque": torque,
     }
@@ -40,7 +43,8 @@ def ctrl2components(act, joint_vel):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
 
-    des_angvel = torch.zeros(des_pos.shape[0], 3, device=des_pos.device)
+    #des_angvel = torch.zeros(des_pos.shape[0], 3, device=des_pos.device)
+    des_angvel = logits["des_com_angvel"] * 0.20
     #des_angvel_mag = torch.norm(des_angvel, dim =-1, keepdim=True)
     #des_angvel_mag_clipped = torch.clamp(des_angvel_mag, max = 2.0)
     #des_angvel = des_angvel * (des_angvel_mag_clipped / (1e-6 + des_angvel_mag))
@@ -278,11 +282,12 @@ def highlvlPD(base_quat, base_angvel,
               com_vel, w):
     q_wb = base_quat
     global_des_vel = quat_apply(q_wb, des_vel)
+    global_des_angvel = quat_apply(q_wb, des_angvel)
 
     com_acc = lin_gain * (global_des_vel - com_vel)
 
     com_angvel = base_angvel
-    ang_acc = angvel_gain * (des_angvel - com_angvel)
+    ang_acc = angvel_gain * (global_des_angvel - com_angvel)
 
     return com_acc, ang_acc
 

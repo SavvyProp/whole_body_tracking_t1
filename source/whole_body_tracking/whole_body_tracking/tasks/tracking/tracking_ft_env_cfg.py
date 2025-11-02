@@ -272,9 +272,14 @@ class RewardsCfg:
         weight=0.1,
         params = {}
     )
+    centroid_angvel = RewTerm(
+        func=mdp.centroid_angular_velocity,
+        weight=0.05,
+        params = {}
+    )
     force_correctness = RewTerm(
         func=mdp.ft_force_correctness,
-        weight=0.15,
+        weight=0.25,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",

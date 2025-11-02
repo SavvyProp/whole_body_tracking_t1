@@ -101,6 +101,17 @@ def centroid_velocity(env: ManagerBasedRLEnv):
     linvel_rew = torch.exp(-lse / 0.25)
     return linvel_rew
 
+def centroid_angular_velocity(env: ManagerBasedRLEnv):
+    command_name = "motion"
+    command: MotionCommand = env.command_manager.get_term(command_name)
+    body_indexes = _get_body_indexes(command, ["Trunk"])
+    angvel = command.body_ang_vel_w[:, body_indexes][:, 0, :]
+    des_angvel = env.ft_rew_info["components"]["des_com_angvel"][:, :3]
+    lse = torch.sum(torch.square(angvel - des_angvel), dim=-1)
+
+    linvel_rew = torch.exp(-lse / 3.14**2)
+    return linvel_rew
+
 def ft_action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the rate of change of the actions using L2 squared kernel."""
     pos_component = env.action_manager.action[:, :23]
