@@ -245,7 +245,7 @@ def ft_ref(
     unaccounted_weight = torch.exp(torch.clamp(uc_w, min=-6.0, max=6.0))  # (N,)
     ctrl_num = tau_ref.shape[-1]
     unaccounted_jac = torch.zeros(
-        jacs.shape[0], 6, ctrl_num + 6
+        jacs.shape[0], 6, ctrl_num + 6, device = jacs.device
     )
     jacs = torch.cat([unaccounted_jac, jacs], dim = 1)
     #unaccounted_pos = com_pos
