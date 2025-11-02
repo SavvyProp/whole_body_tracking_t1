@@ -31,7 +31,7 @@ def ctrl2logits(act):
               CTRL_NUM * 2 + EEF_NUM + 3]
     des_com_angvel = act[:, CTRL_NUM * 2 + EEF_NUM + 3:
                 CTRL_NUM * 2 + EEF_NUM + 6]
-    uc_w = act[:, -1]
+    uc_w = act[:, -1:]
     logits = {
         "des_pos": des_pos,
         "des_com_vel": des_com_vel,
@@ -89,42 +89,43 @@ def make_centroidal_ag(
     r = eefpos - com_pos[:, None, :]
     f_blocks = []
     batch_invI = INV_ANGULAR_INERTIA.expand(r.shape[0], -1, -1)  # (N,3,3)
-    for i in range(EEF_NUM + 1):
+    for i in range(eefpos.shape[1]):
         v = r[:, i, :]  # (N, 3)
         S = torch.zeros(v.shape[0], 3, 3, device=v.device, dtype=v.dtype)
         S[:, 0, 1] = -v[:, 2]; S[:, 0, 2] =  v[:, 1]
         S[:, 1, 0] =  v[:, 2]; S[:, 1, 2] = -v[:, 0]
         S[:, 2, 0] = -v[:, 1]; S[:, 2, 1] =  v[:, 0]
         f_top = torch.cat([
-            torch.eye(3, device=v.device) / MASS,
-            torch.zeros((3, 3), device=v.device)
+            torch.eye(3, device=v.device, dtype=v.dtype) / MASS,
+            torch.zeros((3, 3), device=v.device, dtype=v.dtype)
         ], dim=1)  # (N, 3, 6)
         f_top = f_top.expand(v.shape[0], -1, -1)
         f_bot = torch.cat([batch_invI @ S, batch_invI], dim=2)
         f_block = torch.cat([f_top, f_bot], dim=1)  # (N, 6,6)
         f_blocks.append(f_block)
-    a = torch.cat(f_blocks, dim=2)  # (N, 6, 6*EEF_NUM)
-    g = torch.tensor([0, 0, -9.81, 0, 0, 0], device=eefpos.device)  # (6,)
+    a = torch.cat(f_blocks, dim=2)  # (N, 6, 6*EEF_NUM or 6*(EEF_NUM+1))
+    g = eefpos.new_tensor([0.0, 0.0, -9.81, 0.0, 0.0, 0.0])  # (6,)
     return a, g
 
-def f_mag_q(w):
-    # w: (N, EEF_NUM) or (EEF_NUM,)
-    logits = -torch.clip(w, min=-6.0, max=6.0)          # (N, EEF_NUM)
-    scale_lin = torch.exp(logits)                        # (N, EEF_NUM)
-    scale_ang = scale_lin * 40.0                         # (N, EEF_NUM)
+def f_mag_q(w: torch.Tensor) -> torch.Tensor:
+    # Accept (N, E) or (E,)
+    if w.ndim == 1:
+        w = w.unsqueeze(0)  # (1, E)
 
-    F_size = (EEF_NUM + 1) * 6
-    qp_q = torch.eye(F_size, device=w.device, dtype=w.dtype).unsqueeze(0).expand(w.shape[0], -1, -1).clone()
+    # Same scaling as your original
+    logits    = -torch.clip(w, min=-6.0, max=6.0)  # (N, E)
+    scale_lin = torch.exp(logits)                  # (N, E)
+    scale_ang = scale_lin * 40.0                   # (N, E)
 
-    for i in range(EEF_NUM + 1):
-        r0 = i * 6
-        r3 = r0 + 3
-        r6 = r0 + 6
-        s_lin = scale_lin[:, i].view(-1, 1, 1)          # (N,1,1)
-        s_ang = scale_ang[:, i].view(-1, 1, 1)          # (N,1,1)
-        qp_q[:, r0:r3, r0:r3] *= s_lin                  # translational 3x3
-        qp_q[:, r3:r6, r3:r6] *= s_ang                  # rotational 3x3
+    # Build per-effector 6-tuple = [lin, lin, lin, ang, ang, ang]
+    # Shape: (N, E, 6) so each effector's 6 entries stay contiguous
+    lin3 = scale_lin.unsqueeze(-1).expand(-1, -1, 3)  # (N,E,3)
+    ang3 = scale_ang.unsqueeze(-1).expand(-1, -1, 3)  # (N,E,3)
+    per_eff = torch.cat([lin3, ang3], dim=-1)         # (N,E,6)
 
+    # Flatten effector+axis to (N, E*6), then put on the diagonal
+    diag_vec = per_eff.reshape(per_eff.shape[0], -1)  # (N, E*6)
+    qp_q = torch.diag_embed(diag_vec)                 # (N, E*6, E*6)
     return qp_q
 
 def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor):
@@ -238,6 +239,8 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
         sol = sol.squeeze(0)
     return sol
 
+jit_schur_solve = torch.compile(schur_solve)
+
 def ft_ref(
     eefpos, com_pos, jacs, tau_ref, com_ref, w, uc_w, debug = False
 ):
@@ -245,16 +248,16 @@ def ft_ref(
     unaccounted_weight = torch.exp(torch.clamp(uc_w, min=-6.0, max=6.0))  # (N,)
     ctrl_num = tau_ref.shape[-1]
     unaccounted_jac = torch.zeros(
-        jacs.shape[0], 6, ctrl_num + 6, device = jacs.device
+        (jacs.shape[0], 6, ctrl_num + 6), device = jacs.device, dtype = jacs.dtype
     )
     jacs = torch.cat([unaccounted_jac, jacs], dim = 1)
-    #unaccounted_pos = com_pos
+    unaccounted_pos = com_pos
     eefpos = torch.cat([
         com_pos[:, None, :], eefpos
     ], dim = 1)
 
     w = torch.cat([
-        unaccounted_weight[:, None], w
+        unaccounted_weight, w
     ], dim = 1)
 
     weights = torch.tensor([1e-3, 1e-2], device=eefpos.device)
@@ -275,7 +278,7 @@ def ft_ref(
 
     cons_lhs, cons_rhs = centroidal_qacc_cons(a, g, com_ref)
 
-    f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
+    f = jit_schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
     #contact_fac = torch.sigmoid(w)
     #scale = contact_fac.repeat_interleave(6, dim=-1)  # (N, 6*EEF_NUM)
@@ -344,7 +347,7 @@ def step(com_pos, com_vel,
     return comp_dict["des_pos"], tau
 
 try:
-    jit_step = torch.compile(step)
+    jit_step = torch.compile(step, backend="eager")
     # You can also compile other hot helpers if desired:
     # ft_ref = torch.compile(ft_ref, mode="max-autotune", fullgraph=False)
 except Exception as _e:
