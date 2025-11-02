@@ -264,7 +264,6 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
         sol = sol.squeeze(0)
     return sol
 
-jit_schur_solve = torch.compile(schur_solve)
 
 def ft_ref(
     eefpos_, com_pos, jacs_, tau_ref, com_ref, w_, uc_w, debug = False
