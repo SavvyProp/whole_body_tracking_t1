@@ -269,7 +269,7 @@ def ft_ref(
     eefpos_, com_pos, jacs_, tau_ref, com_ref, w_, uc_w, debug = False
 ):
     # Concat the unaccounted force component
-    unaccounted_weight = torch.exp(torch.clamp(uc_w, min=-6.0, max=6.0))  # (N,)
+    unaccounted_weight = torch.exp(torch.clamp(uc_w, min=-8.0, max=8.0))  # (N,)
     ctrl_num = tau_ref.shape[-1]
     unaccounted_jac = torch.zeros(
         (jacs_.shape[0], 6, ctrl_num + 6), device = jacs_.device
