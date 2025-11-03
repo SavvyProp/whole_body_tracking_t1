@@ -71,7 +71,7 @@ def ctrl2components(act, joint_vel):
 
     d_gain_lin = 5.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = 0.10
+    d_gain_angvel = 0.07
 
     return {
         "des_pos": des_pos,
@@ -140,7 +140,7 @@ def f_mag_q(w: torch.Tensor) -> torch.Tensor:
     # Same scaling as your original
     logits    = -torch.clip(w, min=-6.0, max=6.0)  # (N, E)
     scale_lin = torch.exp(logits)                  # (N, E)
-    scale_ang = scale_lin * 40.0                   # (N, E)
+    scale_ang = scale_lin * 60.0                   # (N, E)
 
     # Build per-effector 6-tuple = [lin, lin, lin, ang, ang, ang]
     # Shape: (N, E, 6) so each effector's 6 entries stay contiguous
@@ -310,16 +310,16 @@ def ft_ref(
     candidate_tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
 
-    #t = torch.where(candidate_tau > TORQUE_LIMITS[None, :],
-    #                TORQUE_LIMITS[None, :], -TORQUE_LIMITS[None, :])
-    #d = (t - tau_ref) / (candidate_tau - tau_ref)
-    #scaling_fac = torch.clamp(d, min=0.0, max=1.0)
-    #scaling_fac = torch.where(candidate_tau.abs() <= TORQUE_LIMITS[None, :],
-    #                          1.0, scaling_fac)
+    t = torch.where(candidate_tau > TORQUE_LIMITS[None, :],
+                    TORQUE_LIMITS[None, :], -TORQUE_LIMITS[None, :])
+    d = (t - tau_ref) / (candidate_tau - tau_ref)
+    scaling_fac = torch.clamp(d, min=0.0, max=1.0)
+    scaling_fac = torch.where(candidate_tau.abs() <= TORQUE_LIMITS[None, :],
+                              1.0, scaling_fac)
 
-    #min_scaling_fac, _ = torch.min(scaling_fac, dim = -1, keepdim = True)
-    #tau = tau_ref * (1 - min_scaling_fac) + candidate_tau * min_scaling_fac
-    tau = torch.clamp(candidate_tau, min=-TORQUE_LIMITS[None, :], max=TORQUE_LIMITS[None, :])
+    min_scaling_fac, _ = torch.min(scaling_fac, dim = -1, keepdim = True)
+    tau = tau_ref * (1 - min_scaling_fac) + candidate_tau * min_scaling_fac
+    #tau = torch.clamp(candidate_tau, min=-TORQUE_LIMITS[None, :], max=TORQUE_LIMITS[None, :])
     f = f[:, 6:] # remove unaccounted force
 
     if debug:
