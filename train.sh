@@ -1,3 +1,3 @@
 python scripts/rsl_rl/train.py --task=Tracking-Flat-T1-v0 \
---registry_name ludwigtaycheeying-purdue-university-org/wandb-registry-motions/accad_crawl2 \
---headless --logger wandb --log_project_name t1_flat --run_name accad_crawl2
+--registry_name ludwigtaycheeying-purdue-university-org/wandb-registry-motions/elena_neutral \
+--headless --logger wandb --log_project_name t1_flat --run_name elena_neutral
