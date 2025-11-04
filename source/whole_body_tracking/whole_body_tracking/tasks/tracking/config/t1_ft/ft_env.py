@@ -38,7 +38,7 @@ def model_based_controller(robot, action):
     pos, ff_torque = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
     #ff_torque = action[:, 23:46] * 0.05
-    ff_torque += nle
+    #ff_torque += nle
 
     return pos, ff_torque
 
