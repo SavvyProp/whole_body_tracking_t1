@@ -221,7 +221,7 @@ class RewardsCfg:
     )
     motion_body_ori = RewTerm(
         func=mdp.motion_relative_body_orientation_error_exp,
-        weight=1.0,
+        weight=1.5,
         params={"command_name": "motion", "std": 0.4},
     )
     motion_body_lin_vel = RewTerm(
