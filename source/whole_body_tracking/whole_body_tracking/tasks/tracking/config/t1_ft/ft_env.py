@@ -19,6 +19,11 @@ def model_based_controller(robot, action):
     body_pos_w = robot.data.body_pos_w
 
     jacs = robot.root_physx_view.get_jacobians()
+
+    cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_forces()
+    grav_nle = robot.root_physx_view.get_generalized_gravity_forces()
+    nle = cor_nle + grav_nle
+    
     # Base position (world): pos (3) + quat (4)
     
     base_quat = robot.data.root_link_quat_w  # (N, 3)
@@ -33,6 +38,7 @@ def model_based_controller(robot, action):
     pos, ff_torque = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
     #ff_torque = action[:, 23:46] * 0.05
+    ff_torque += nle
 
     return pos, ff_torque
 

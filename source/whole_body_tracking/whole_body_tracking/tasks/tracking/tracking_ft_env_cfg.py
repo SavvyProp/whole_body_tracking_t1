@@ -275,7 +275,7 @@ class RewardsCfg:
     )
     force_correctness = RewTerm(
         func=mdp.ft_force_correctness,
-        weight=0.10,
+        weight=0.20,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
