@@ -1,1 +1,1 @@
-python scripts/rsl_rl/eval_spd.py --task=Tracking-Flat-T1-v0 --num_envs=64 --wandb_path=ludwigtaycheeying-purdue-university/t1_flat/d5lf7doq --headless
+python scripts/rsl_rl/eval_spd.py --task=Tracking-Flat-T1-v0 --num_envs=64 --wandb_path=ludwigtaycheeying-purdue-university/t1_flat/croso8ba --headless
