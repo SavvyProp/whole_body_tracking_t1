@@ -204,7 +204,7 @@ def centroidal_qacc_cons(big_a, g, com_ref):
     rhs = com_ref - g
     return lhs, rhs
 
-def schur_solve_(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, cons_rhs: torch.Tensor, reg: float = 0.0):
+def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, cons_rhs: torch.Tensor, reg: float = 0.0):
     """
     qp_q:    (..., F, F)
     qp_c:    (..., F)
@@ -264,106 +264,6 @@ def schur_solve_(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor,
         sol = sol.squeeze(0)
     return sol
 
-# ...existing code...
-def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, cons_rhs: torch.Tensor, reg: float = 0.0):
-    """
-    Solve KKT:
-      [Q  A^T][x] = [c]
-      [A   0 ][λ]   [b]
-    using Schur complement with a Cholesky of Q.
-
-    Shapes:
-      Q: (..., F, F), c: (..., F), A: (..., M, F), b: (..., M)
-    """
-    device = qp_q.device
-    dtype = qp_q.dtype
-
-    qp_c = qp_c.to(device=device, dtype=dtype)
-    cons_lhs = cons_lhs.to(device=device, dtype=dtype)
-    cons_rhs = cons_rhs.to(device=device, dtype=dtype)
-
-    squeeze_out = False
-    if qp_q.dim() == 2:
-        qp_q = qp_q.unsqueeze(0)
-        qp_c = qp_c.unsqueeze(0)
-        cons_lhs = cons_lhs.unsqueeze(0)
-        cons_rhs = cons_rhs.unsqueeze(0)
-        squeeze_out = True
-
-    batch_shape = qp_q.shape[:-2]
-    F = qp_q.shape[-1]
-    M = cons_lhs.shape[-2]
-
-    # Symmetrize and regularize Q to be SPD
-    Q = 0.5 * (qp_q + qp_q.transpose(-1, -2))
-    if reg > 0.0:
-        I_F = torch.eye(F, device=device, dtype=dtype).expand(*batch_shape, F, F)
-        Q = Q + reg * I_F
-
-    # Cholesky (with small adaptive jitter fallback for numerical safety)
-    def chol_spd(Qmat):
-        L, info = torch.linalg.cholesky_ex(Qmat, upper=False)
-        if torch.any(info > 0):
-            jitter = 1e-8
-            bad = info > 0
-            eye = torch.eye(F, device=device, dtype=dtype)
-            for _ in range(5):
-                if not torch.any(bad):
-                    break
-                Qmat[bad] = Qmat[bad] + jitter * eye
-                Lb, infob = torch.linalg.cholesky_ex(Qmat[bad], upper=False)
-                L[bad] = Lb
-                info[bad] = infob
-                bad = info > 0
-                jitter *= 10.0
-            if torch.any(info > 0):
-                # final fallback (rare): solve full KKT
-                AT = cons_lhs.transpose(-1, -2)
-                Z = Q.new_zeros(*batch_shape, M, M)
-                top = torch.cat([Q, AT], dim=-1)
-                bot = torch.cat([cons_lhs, Z], dim=-1)
-                KKT = torch.cat([top, bot], dim=-2)
-                rhs = torch.cat([qp_c, cons_rhs], dim=-1)
-                sol_all = torch.linalg.solve(KKT, rhs.unsqueeze(-1)).squeeze(-1)
-                x = sol_all[..., :F]
-                return x, None
-        return None, L
-
-    x_fallback, L = chol_spd(Q)
-    if x_fallback is not None:
-        return x_fallback.squeeze(0) if squeeze_out else x_fallback
-
-    # Helper solves with Cholesky (batched)
-    def solve_Q(rhs):  # returns Q^{-1} rhs
-        return torch.cholesky_solve(rhs, L, upper=False)
-
-    c = qp_c
-    A = cons_lhs
-    b = cons_rhs
-    AT = A.transpose(-1, -2)  # (..., F, M)
-
-    # y_c = Q^{-1} c
-    y_c = solve_Q(c.unsqueeze(-1))  # (..., F, 1)
-
-    # TMP = Q^{-1} A^T
-    TMP = solve_Q(AT)               # (..., F, M)
-
-    # Schur matrix K = A Q^{-1} A^T = A @ TMP  (M x M per batch)
-    K = A @ TMP                     # (..., M, M)
-
-    # rhs_lambda = A y_c - b
-    rhs_lambda = (A @ y_c).squeeze(-1) - b  # (..., M)
-
-    # Solve for λ: K λ = rhs_lambda
-    lam = torch.linalg.solve(K, rhs_lambda.unsqueeze(-1))  # (..., M, 1)
-
-    # x = Q^{-1} c - Q^{-1} A^T λ = y_c - TMP @ λ
-    x = (y_c - TMP @ lam).squeeze(-1)  # (..., F)
-
-    if squeeze_out:
-        x = x.squeeze(0)
-    return x
-# ...existing code...
 
 def ft_ref(
     eefpos_, com_pos, jacs_, tau_ref, com_ref, w_, uc_w, debug = False
