@@ -161,12 +161,10 @@ class FTEnv(ManagerBasedRLEnv):
             self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], self.action_manager._action)
 
         # perform physics stepping
-        pos, torque = model_based_controller(self.scene["robot"], self.action_manager._action)
         for i in range(self.cfg.decimation):
             self._sim_step_counter += 1
             # set actions into buffers
-            if (i + 1) % 2 == 0:
-                pos, torque = model_based_controller(self.scene["robot"], self.action_manager._action)
+            pos, torque = model_based_controller(self.scene["robot"], self.action_manager._action)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
             # set actions into simulator
