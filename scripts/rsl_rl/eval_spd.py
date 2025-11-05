@@ -88,7 +88,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             file = args_cli.wandb_path.split("/")[-1]
         else:
             file = max(files, key=lambda x: int(x.split("_")[1].split(".")[0]))
-        file = "model_8000.pt"
+        file = "model_4500.pt"
 
         wandb_file = wandb_run.file(str(file))
         wandb_file.download("./logs/rsl_rl/temp", replace=True)
@@ -159,6 +159,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     attach_onnx_metadata(env.unwrapped, args_cli.wandb_path if args_cli.wandb_path else "none", export_model_dir)
     # reset environment
     obs = env.get_observations()
+    motion_cmd = env.unwrapped.command_manager.get_term("motion")
     #obs, _ = env.get_observations()
     timestep = 0
     # simulate environment
@@ -167,7 +168,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         eval_name = "eval_data/ft_spd_eval_data.npz"
     else:
         eval_name = "eval_data/pd_spd_eval_data.npz"
-
     duration = 1000
 
     root_vel_error = np.zeros((duration, env_cfg.scene.num_envs, 5))
