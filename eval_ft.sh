@@ -1,1 +1,1 @@
-python scripts/rsl_rl/play.py --task=Tracking-FT-T1-v0 --num_envs=2 --wandb_path=ludwigtaycheeying-purdue-university/t1ft_fb/b3lfj5k7 # --video --video_length 1000
+python scripts/rsl_rl/play.py --task=Tracking-FT-T1-v0 --num_envs=2 --wandb_path=ludwigtaycheeying-purdue-university/t1ft_fb/834f4eoe # --video --video_length 1000

@@ -88,7 +88,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             file = args_cli.wandb_path.split("/")[-1]
         else:
             file = max(files, key=lambda x: int(x.split("_")[1].split(".")[0]))
-        file = "model_3500.pt"
+        file = "model_7000.pt"
 
         wandb_file = wandb_run.file(str(file))
         wandb_file.download("./logs/rsl_rl/temp", replace=True)
