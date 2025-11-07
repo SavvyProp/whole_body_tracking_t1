@@ -7,6 +7,7 @@ import sys
 import numpy as np
 
 from isaaclab.app import AppLauncher
+from isaaclab.utils.math import quat_error_magnitude
 # local imports
 import cli_args  # isort: skip
 
@@ -160,6 +161,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # reset environment
     obs = env.get_observations()
     motion_cmd = env.unwrapped.command_manager.get_term("motion")
+    #motion_cmd.time_steps = torch.zeros_like(motion_cmd.time_steps, 
+    #                                         device = motion_cmd.time_steps.device)
     #obs, _ = env.get_observations()
     timestep = 0
     # simulate environment
@@ -170,9 +173,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         eval_name = "eval_data/pd_spd_eval_data.npz"
     duration = 1000
 
-    root_vel_error = np.zeros((duration, env_cfg.scene.num_envs, 5))
-    root_angvel_error = np.zeros((duration, env_cfg.scene.num_envs, 5))
+    terminations = np.zeros((duration, env_cfg.scene.num_envs), dtype=bool)
+    root_vel_error = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+    root_angvel_error = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+    root_pos_error = np.zeros((duration, env_cfg.scene.num_envs))
+    root_orient_error = np.zeros((duration, env_cfg.scene.num_envs))
     for c in range(duration):
+        #set_random_force(env.unwrapped)
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
@@ -183,8 +190,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             obs, _, terminated_, _ = env.step(actions)
             vel_error = motion_global_anchor_velocity_error(env)
             angvel_error = motion_global_anchor_angular_velocity_error(env)
-            root_vel_error[c, :, :] = vel_error.cpu().numpy()
-            root_angvel_error[c, :, :] = angvel_error.cpu().numpy()
+            root_vel_error[c, :, :, :] = vel_error.cpu().numpy()
+            root_angvel_error[c, :, :, :] = angvel_error.cpu().numpy()
+            terminations[c, :] = terminated_.cpu().numpy()
+            root_pos_error[c, :] = motion_global_anchor_position_error_exp(env).cpu().numpy()
+            root_orient_error[c, :] = motion_global_anchor_orientation_error_exp(env).cpu().numpy()
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
@@ -193,8 +203,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # Save the eval data
     np.savez(eval_name, **{
+                           "terminations": terminations,
                            "root_vel_error": root_vel_error,
                            "root_angvel_error": root_angvel_error,
+                           "root_pos_error": root_pos_error,
+                           "root_orient_error": root_orient_error,
                            })
     # close the simulator
     env.close()
@@ -206,24 +219,50 @@ body_names = [
 def motion_global_anchor_velocity_error(env) -> torch.Tensor:
     command = env.unwrapped.command_manager.get_term("motion")
     body_ids = _get_body_indexes(command, body_names)
-    error = torch.sum(
-        torch.square(command.body_lin_vel_w[:, body_ids] - 
-                     command.robot_body_lin_vel_w[:, body_ids]), dim=-1
-    )
-    return torch.sqrt(error)
+    error = command.body_lin_vel_w[:, body_ids] - command.robot_body_lin_vel_w[:, body_ids]
+    return error
 
 def motion_global_anchor_angular_velocity_error(env) -> torch.Tensor:
     command = env.unwrapped.command_manager.get_term("motion")
     body_ids = _get_body_indexes(command, body_names)
-    error = torch.sum(
-        torch.square(command.body_ang_vel_w[:, body_ids] - 
-                     command.robot_body_ang_vel_w[:, body_ids]), dim=-1
-    )
+    error = command.body_ang_vel_w[:, body_ids] - command.robot_body_ang_vel_w[:, body_ids]
+    return error
+
+def motion_global_anchor_position_error_exp(env) -> torch.Tensor:
+    command = env.unwrapped.command_manager.get_term("motion")
+    error = torch.sum(torch.square(command.anchor_pos_w - command.robot_anchor_pos_w), dim=-1)
     return torch.sqrt(error)
+
+
+def motion_global_anchor_orientation_error_exp(env) -> torch.Tensor:
+    command = env.unwrapped.command_manager.get_term("motion")
+    error = quat_error_magnitude(command.anchor_quat_w, command.robot_anchor_quat_w) ** 2
+    return error
 
 def _get_body_indexes(command, body_names: list[str] | None) -> list[int]:
     return [i for i, name in enumerate(command.cfg.body_names) if (body_names is None) or (name in body_names)]
 
+def set_random_force(env):
+
+    num_envs = env.num_envs
+    # apply random impulse forces to the robot at if timestep meets threshold
+    # round(sin(env_num / 6) * 100 + 150 ) == step
+    frc_mask = torch.rand(num_envs, device=env.device) < 0.1
+    frc = torch.randn((num_envs, 3), device=env.device) * 400
+
+    frc = torch.where(frc_mask[:, None] == 1, frc, torch.zeros_like(frc))
+
+    robot = env.scene["robot"]
+    num_bodies = robot.num_bodies
+    forces_b = torch.zeros((num_envs, 1, 3), device=env.device)
+    torques_b = torch.zeros((num_envs, 1, 3), device=env.device)
+    forces_b[:, 0, :] = frc  # apply to base link
+
+    body_ids = torch.arange(num_bodies, device=env.device)
+
+    robot.set_external_force_and_torque(forces = forces_b, torques = torques_b, body_ids = [0], is_global = True)
+
+    return
 
 if __name__ == "__main__":
     # run the main function
