@@ -172,18 +172,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         #jnt_pos = obs["policy"][0, 61:84]
         jnt_pos = robot.data.joint_pos[0, :]
         action_ = actions[0, :]
-        print("Obs interst")
-        print(obs["policy"][0, 46:(46 +15)])
         print("Joint Positions:")
         print(jnt_pos)
         print("Actions:")
         print(action_)
-        print("Sim Torques")
-        print(action_ - jnt_pos)
-        print("Joint Vel")
-        print(robot.data.joint_vel[0, :])
-        print("Applied Torques:")
-        print(robot.data.applied_torque[0, :])
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
