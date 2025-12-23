@@ -1,1 +1,1 @@
-python scripts/rsl_rl/play.py --task=Tracking-Flat-T1-v0 --num_envs=2 --wandb_path=ludwigtaycheeying-purdue-university/t1_flat_bmarm/e5qyjbtb
+python scripts/rsl_rl/play.py --task=Tracking-Flat-T1-v0 --num_envs=2 --wandb_path=ludwigtaycheeying-purdue-university/t1_flat_bmarm/c15qz1c6
