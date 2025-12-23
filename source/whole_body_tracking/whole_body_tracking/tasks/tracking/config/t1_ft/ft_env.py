@@ -7,22 +7,23 @@ from isaaclab.managers import ActionManager, EventManager, ObservationManager, R
 from isaaclab.managers import CommandManager, CurriculumManager, RewardManager, TerminationManager
 from isaaclab.ui.widgets import ManagerLiveVisualizer
 import time
+from whole_body_tracking.utils.ft import EEF_BODIES
 # Implementation of FT environment. Idea is to implement the pure FT
 # function and save a ft_info dict as part of the env class
 # No observation change, contact rewards, centroid velocity rewards
 
 # Implementation note: build a custom ActionManager with overriden action size
 # ActionManager should have the big action size
-
+from isaaclab.managers import SceneEntityCfg
 
 def model_based_controller(robot, action):
     body_pos_w = robot.data.body_pos_w
 
     jacs = robot.root_physx_view.get_jacobians()
 
-    cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_forces()
-    grav_nle = robot.root_physx_view.get_generalized_gravity_forces()
-    nle = cor_nle + grav_nle
+    #cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_forces()
+    #grav_nle = robot.root_physx_view.get_generalized_gravity_forces()
+    #nle = cor_nle + grav_nle
     
     # Base position (world): pos (3) + quat (4)
     
@@ -42,7 +43,7 @@ def model_based_controller(robot, action):
 
     return pos, ff_torque
 
-def make_ft_rew_dict(robot, action):
+def make_ft_rew_dict(robot, action, contact_mask):
     body_pos_w = robot.data.body_pos_w
 
     jacs = robot.root_physx_view.get_jacobians()
@@ -59,7 +60,8 @@ def make_ft_rew_dict(robot, action):
 
     ft_rew_dict = ft.ft_rew_info(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
-    
+    ft_rew_dict["debug"]["applied_torque"] = robot.data.applied_torque
+    ft_rew_dict["debug"]["contact_mask"] = contact_mask
     return ft_rew_dict
 
 class FTActionManager(ActionManager):
@@ -85,10 +87,18 @@ class FTActionManager(ActionManager):
             term.process_actions(term_actions)
             idx += term.action_dim
 
+
 class FTEnv(ManagerBasedRLEnv):
     def __init__(self, cfg: TrackingEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
         self.ft_rew_info = None  # placeholder for ft reward info
+        self.substep_vel = torch.zeros((cfg.decimation, cfg.scene.num_envs, 6), device=cfg.sim.device)
+        self.sensor_cfg = SceneEntityCfg(
+                "contact_forces",
+                body_names=EEF_BODIES
+            )
+        
+        self.sensor_cfg.resolve(self.scene)
 
     def load_managers(self):
         # note: this order is important since observation manager needs to know the command and action managers
@@ -155,13 +165,14 @@ class FTEnv(ManagerBasedRLEnv):
         # check if we need to do rendering within the physics loop
         # note: checked here once to avoid multiple checks within the loop
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
-
-        with torch.no_grad():
-            action_ = action.clone()
-            self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], self.action_manager._action)
-
         # perform physics stepping
         for i in range(self.cfg.decimation):
+            robot = self.scene["robot"]
+            body_vel = robot.data.body_link_lin_vel_w[:, 0, :]
+            body_angvel = robot.data.body_link_ang_vel_w[:, 0, :]
+            self.substep_vel[i, :, :3] = body_vel
+            self.substep_vel[i, :, 3:] = body_angvel
+
             self._sim_step_counter += 1
             # set actions into buffers
             pos, torque = model_based_controller(self.scene["robot"], self.action_manager._action)
@@ -179,6 +190,17 @@ class FTEnv(ManagerBasedRLEnv):
                 self.sim.render()
             # update buffers at sim dt
             self.scene.update(dt=self.physics_dt)
+
+        with torch.no_grad():
+            #action_ = action.clone()
+            
+            contact_sensor = self.scene.sensors[self.sensor_cfg.name]
+            net_forces_w = contact_sensor.data.net_forces_w[:, self.sensor_cfg.body_ids]
+            contact_mask = (torch.linalg.norm(net_forces_w, dim=-1) > 10.0)  # (N, |body_ids|)
+            print(net_forces_w.shape, self.sensor_cfg.body_ids)
+            self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], 
+                                                self.action_manager._action,
+                                                contact_mask)
 
         # post-step:
         # -- update env counters (used for curriculum generation)

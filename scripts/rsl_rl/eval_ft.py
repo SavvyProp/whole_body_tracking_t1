@@ -154,6 +154,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     attach_onnx_metadata(env.unwrapped, args_cli.wandb_path if args_cli.wandb_path else "none", export_model_dir)
     # reset environment
     obs, _ = env.get_observations()
+    motion_cmd = env.unwrapped.command_manager.get_term("motion")
+    motion_cmd.time_steps = torch.zeros_like(motion_cmd.time_steps, 
+                                             device = motion_cmd.time_steps.device)
     #obs, _ = env.get_observations()
     timestep = 0
     # simulate environment

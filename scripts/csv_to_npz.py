@@ -274,6 +274,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
 
         # set joint state
         joint_pos = robot.data.default_joint_pos.clone()
+        print(robot_joint_indexes)
         joint_vel = robot.data.default_joint_vel.clone()
         joint_pos[:, robot_joint_indexes] = motion_dof_pos
         joint_vel[:, robot_joint_indexes] = motion_dof_vel

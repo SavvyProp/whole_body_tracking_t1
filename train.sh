@@ -1,3 +1,3 @@
 python scripts/rsl_rl/train.py --task=Tracking-Flat-T1-v0 \
---registry_name ludwigtaycheeying-purdue-university-org/wandb-registry-motions/CMU_13_40 \
---headless --logger wandb --log_project_name t1_flat --run_name CMU_13_40
+--registry_name ludwigtaycheeying-purdue-university-org/wandb-registry-motions/CMU_49_20 \
+--headless --logger wandb --log_project_name t1_flat_bmarm --run_name CMU_49_20

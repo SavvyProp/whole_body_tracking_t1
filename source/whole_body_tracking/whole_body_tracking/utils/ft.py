@@ -339,7 +339,7 @@ def highlvlPD(base_quat, base_angvel,
     com_angvel = base_angvel
     ang_acc = angvel_gain * (global_des_angvel - com_angvel)
 
-    return com_acc, ang_acc
+    return com_acc, ang_acc, global_des_vel, global_des_angvel
 
 def step(com_pos, com_vel,
          jacs,
@@ -347,7 +347,7 @@ def step(com_pos, com_vel,
          base_quat, base_angvel, joint_vel,
          action):
     comp_dict = ctrl2components(action, joint_vel)
-    com_acc, ang_acc = highlvlPD(
+    com_acc, ang_acc, _, _ = highlvlPD(
         base_quat, base_angvel,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
         comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
@@ -383,7 +383,7 @@ def ft_rew_info(com_pos, com_vel,
          action):
     logits = ctrl2logits(action)
     comp_dict = ctrl2components(action, joint_vel)
-    com_acc, ang_acc = highlvlPD(
+    com_acc, ang_acc, global_des_vel, global_des_angvel = highlvlPD(
         base_quat, base_angvel,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
         comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
@@ -402,8 +402,14 @@ def ft_rew_info(com_pos, com_vel,
         comp_dict["uc_w"], debug=True
     )
     debug_dict = {
+        "des_com_vel": global_des_vel,
+        "des_com_angvel": global_des_angvel,
+        "real_vel": com_vel,
+        "real_angvel": base_angvel,
+        "contact_w": torch.sigmoid(logits["w"]),
         "ff_tau": tau.reshape(-1, CTRL_NUM),
         "f": f,
+        "tau_ref": comp_dict["torque"][0, :, :],
         "des_pos": logits["des_pos"],
     }
     return {

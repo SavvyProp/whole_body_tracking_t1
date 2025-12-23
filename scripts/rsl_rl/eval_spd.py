@@ -21,6 +21,7 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--motion_file", type=str, default=None, help="Path to the motion file.")
+parser.add_argument("--checkpoint_no", type=int, default=None, help="Checkpoint number to load.")
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -54,6 +55,7 @@ from isaaclab.envs import (
     multi_agent_to_single_agent,
 )
 from isaaclab.utils.dict import print_dict
+from isaaclab.utils import configclass
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper
 from isaaclab_tasks.utils import get_checkpoint_path
 from isaaclab_tasks.utils.hydra import hydra_task_config
@@ -68,6 +70,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     """Play with RSL-RL agent."""
     agent_cfg: RslRlOnPolicyRunnerCfg = cli_args.parse_rsl_rl_cfg(args_cli.task, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
+
+    env_cfg.events.push_robot = None  # disable random pushes during evaluation
 
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
@@ -89,7 +93,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             file = args_cli.wandb_path.split("/")[-1]
         else:
             file = max(files, key=lambda x: int(x.split("_")[1].split(".")[0]))
-        file = "model_4500.pt"
+        if args_cli.checkpoint_no is not None:
+            file = f"model_{args_cli.checkpoint_no}.pt"
+        # file = "model_4500.pt"
 
         wandb_file = wandb_run.file(str(file))
         wandb_file.download("./logs/rsl_rl/temp", replace=True)
@@ -178,6 +184,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     root_angvel_error = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     root_pos_error = np.zeros((duration, env_cfg.scene.num_envs))
     root_orient_error = np.zeros((duration, env_cfg.scene.num_envs))
+    substep_root_vel = np.zeros((duration * env_cfg.decimation, env_cfg.scene.num_envs, 6))
     for c in range(duration):
         #set_random_force(env.unwrapped)
         # run everything in inference mode
@@ -195,6 +202,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             terminations[c, :] = terminated_.cpu().numpy()
             root_pos_error[c, :] = motion_global_anchor_position_error_exp(env).cpu().numpy()
             root_orient_error[c, :] = motion_global_anchor_orientation_error_exp(env).cpu().numpy()
+            substep_root_vel_block = env.unwrapped.substep_vel.cpu().numpy()
+            substep_root_vel[c * env_cfg.decimation:
+                             (c + 1) * env_cfg.decimation, :, :] = substep_root_vel_block
+
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
@@ -203,6 +214,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # Save the eval data
     np.savez(eval_name, **{
+                           "substep_root_vel": substep_root_vel,
                            "terminations": terminations,
                            "root_vel_error": root_vel_error,
                            "root_angvel_error": root_angvel_error,

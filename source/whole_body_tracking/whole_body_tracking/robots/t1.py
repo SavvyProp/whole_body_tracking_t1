@@ -7,6 +7,23 @@ from isaaclab.assets.articulation import ArticulationCfg
 
 from whole_body_tracking.assets import ASSET_DIR
 
+# Change damping to 4 * p / natural_freq
+
+NATURAL_FREQ = 10 * 2.0 * 3.1415926535  # 10Hz
+DAMPING_RATIO = 2.0
+
+ARMATURE_MID = 0.01
+ARMATURE_HIGH = 0.025
+ARMATURE_LOW = 0.005
+
+STIFFNESS_LOW = ARMATURE_LOW * NATURAL_FREQ**2
+STIFFNESS_MID = ARMATURE_MID * NATURAL_FREQ**2
+STIFFNESS_HIGH = ARMATURE_HIGH * NATURAL_FREQ**2
+
+DAMPING_LOW = 2.0 * DAMPING_RATIO * ARMATURE_LOW * NATURAL_FREQ
+DAMPING_MID = 2.0 * DAMPING_RATIO * ARMATURE_MID * NATURAL_FREQ
+DAMPING_HIGH = 2.0 * DAMPING_RATIO * ARMATURE_HIGH * NATURAL_FREQ
+
 BOOSTER_T1_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{ASSET_DIR}/booster/t1/t1.usd",
@@ -73,17 +90,35 @@ BOOSTER_T1_CFG = ArticulationCfg(
                 ".*_Knee_Pitch": 11.7,
                 "Waist": 10.88,
             },
-            stiffness=200.0,
-            damping=5.0,
-            armature=0.01,
+            armature = {
+                ".*_Hip_Pitch": ARMATURE_HIGH,
+                ".*_Hip_Roll": ARMATURE_MID,
+                ".*_Hip_Yaw": ARMATURE_MID,
+                ".*_Knee_Pitch": ARMATURE_HIGH,
+                "Waist": ARMATURE_MID,
+            },
+            stiffness = {
+                ".*_Hip_Pitch": STIFFNESS_HIGH,
+                ".*_Hip_Roll": STIFFNESS_MID,
+                ".*_Hip_Yaw": STIFFNESS_MID,
+                ".*_Knee_Pitch": STIFFNESS_HIGH,
+                "Waist": STIFFNESS_MID,
+            },
+            damping = {
+                ".*_Hip_Pitch": DAMPING_HIGH,
+                ".*_Hip_Roll": DAMPING_MID,
+                ".*_Hip_Yaw": DAMPING_MID,
+                ".*_Knee_Pitch": DAMPING_HIGH,
+                "Waist": DAMPING_MID,
+            }
         ),
         "feet": ImplicitActuatorCfg(
             joint_names_expr=[".*_Ankle_Pitch", ".*_Ankle_Roll"],
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
-            stiffness=50.0,
-            damping=1.0,
-            armature=0.01,
+            stiffness=STIFFNESS_LOW,
+            damping=DAMPING_LOW,
+            armature=ARMATURE_LOW,
         ),
         "arms": ImplicitActuatorCfg(
             joint_names_expr=[
@@ -94,9 +129,9 @@ BOOSTER_T1_CFG = ArticulationCfg(
             ],
             effort_limit_sim=18.0,
             velocity_limit_sim=18.8,
-            stiffness=40.0,
-            damping=10.0,
-            armature=0.01,
+            stiffness=STIFFNESS_LOW,
+            damping=DAMPING_LOW,
+            armature=ARMATURE_LOW,
         ),
     },
 )
@@ -388,7 +423,7 @@ BOOSTER_T1_TT_P_CFG = ArticulationCfg(
         ),
     },
 )
-"""Configuration for the Booster T1 Humanoid robot for Table Tennis, changed default joint positions"""
+"""Configuration for the Booster T1 Humanoid robot for Table Tennis, changed joint positions"""
 
 BOOSTER_T1_TT_P2_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
@@ -606,7 +641,6 @@ for a in BOOSTER_T1_CFG.actuators.values():
     for n in names:
         if n in e and n in s and s[n]:
             T1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
-
 
 
 """Configuration for the Booster T1 Humanoid robot."""

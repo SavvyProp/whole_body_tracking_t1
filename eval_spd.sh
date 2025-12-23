@@ -1,1 +1,1 @@
-python scripts/rsl_rl/eval_spd.py --task=Tracking-Flat-T1-v0 --num_envs=64 --wandb_path=ludwigtaycheeying-purdue-university/t1_flat/jt7b3x4y --headless
+python scripts/rsl_rl/eval_spd.py --task=Tracking-Eval-T1-v0 --num_envs=64 --wandb_path=ludwigtaycheeying-purdue-university/t1_flat/d5lf7doq --checkpoint_no 7500 --headless
