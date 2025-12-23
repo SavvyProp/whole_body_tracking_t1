@@ -133,6 +133,14 @@ BOOSTER_T1_CFG = ArticulationCfg(
             damping=DAMPING_LOW,
             armature=ARMATURE_LOW,
         ),
+        "head": ImplicitActuatorCfg(
+            joint_names_expr=["AAHead_yaw", "Head_pitch"],
+            effort_limit_sim=10.0,
+            velocity_limit_sim=10.0,
+            stiffness=STIFFNESS_LOW,
+            damping=DAMPING_LOW,
+            armature=ARMATURE_LOW,
+        )
     },
 )
 
