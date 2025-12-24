@@ -115,7 +115,7 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         # observation terms (order preserved)
-        #command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
+        command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
         #motion_anchor_pos_b = ObsTerm(
         #    func=mdp.motion_anchor_pos_b, params={"command_name": "motion"}, noise=Unoise(n_min=-0.25, n_max=0.25)
         #)
