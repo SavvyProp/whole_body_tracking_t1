@@ -650,6 +650,7 @@ for a in BOOSTER_T1_CFG.actuators.values():
         if n in e and n in s and s[n]:
             T1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
 
+print("T1_ACTION_SCALE:", T1_ACTION_SCALE)
 
 """Configuration for the Booster T1 Humanoid robot."""
 
