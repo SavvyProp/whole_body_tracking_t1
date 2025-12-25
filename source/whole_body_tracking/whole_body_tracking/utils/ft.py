@@ -46,8 +46,6 @@ def ctrl2logits(act):
 def ctrl2components(act, joint_vel):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
-
-    #des_angvel = torch.zeros(des_pos.shape[0], 3, device=des_pos.device)
     des_angvel = logits["des_com_angvel"] * 0.20
     #des_angvel_mag = torch.norm(des_angvel, dim =-1, keepdim=True)
     #des_angvel_mag_clipped = torch.clamp(des_angvel_mag, max = 2.0)
@@ -310,16 +308,16 @@ def ft_ref(
     candidate_tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
 
-    t = torch.where(candidate_tau > TORQUE_LIMITS[None, :],
-                    TORQUE_LIMITS[None, :], -TORQUE_LIMITS[None, :])
-    d = (t - tau_ref) / (candidate_tau - tau_ref)
-    scaling_fac = torch.clamp(d, min=0.0, max=1.0)
-    scaling_fac = torch.where(candidate_tau.abs() <= TORQUE_LIMITS[None, :],
-                              1.0, scaling_fac)
+    #t = torch.where(candidate_tau > TORQUE_LIMITS[None, :],
+    #                TORQUE_LIMITS[None, :], -TORQUE_LIMITS[None, :])
+    #d = (t - tau_ref) / (candidate_tau - tau_ref)
+    #scaling_fac = torch.clamp(d, min=0.0, max=1.0)
+    #scaling_fac = torch.where(candidate_tau.abs() <= TORQUE_LIMITS[None, :],
+    #                          1.0, scaling_fac)
 
-    min_scaling_fac, _ = torch.min(scaling_fac, dim = -1, keepdim = True)
-    tau = tau_ref * (1 - min_scaling_fac) + candidate_tau * min_scaling_fac
-    #tau = torch.clamp(candidate_tau, min=-TORQUE_LIMITS[None, :], max=TORQUE_LIMITS[None, :])
+    #min_scaling_fac, _ = torch.min(scaling_fac, dim = -1, keepdim = True)
+    #tau = tau_ref * (1 - min_scaling_fac) + candidate_tau * min_scaling_fac
+    tau = torch.clamp(candidate_tau, min=-TORQUE_LIMITS[None, :], max=TORQUE_LIMITS[None, :])
     f = f[:, 6:] # remove unaccounted force
 
     if debug:
