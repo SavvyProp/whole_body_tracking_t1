@@ -34,13 +34,13 @@ def model_based_controller(robot, action):
     base_angvel = robot.data.root_com_ang_vel_b
 
     com_pos = robot.data.root_link_pos_w  # (N, 3)
-    com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
+    com_vel = robot.data.root_link_vel_w[... , :3]  # (N, 3)
+    #com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
     
     pos, ff_torque = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
     #ff_torque = action[:, 23:46] * 0.05
     #ff_torque += nle
-
     return pos, ff_torque
 
 def make_ft_rew_dict(robot, action, contact_mask):
@@ -60,6 +60,7 @@ def make_ft_rew_dict(robot, action, contact_mask):
 
     ft_rew_dict = ft.ft_rew_info(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
+                             
     ft_rew_dict["debug"]["applied_torque"] = robot.data.applied_torque
     ft_rew_dict["debug"]["contact_mask"] = contact_mask
     return ft_rew_dict
