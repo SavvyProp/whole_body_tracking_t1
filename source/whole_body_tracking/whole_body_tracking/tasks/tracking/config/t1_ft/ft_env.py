@@ -37,39 +37,29 @@ def model_based_controller(robot, action):
     com_vel = robot.data.root_link_vel_w[... , :3]  # (N, 3)
     #com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
     
-    pos, ff_torque = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
+    pos, ff_torque, info = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
     #ff_torque = action[:, 23:46] * 0.05
     #ff_torque += nle
-    return pos, ff_torque
+    return pos, ff_torque, info
 
-def make_ft_rew_dict(robot, action, contact_mask):
-    body_pos_w = robot.data.body_pos_w
-
-    jacs = robot.root_physx_view.get_jacobians()
-    # Base position (world): pos (3) + quat (4)
-    
-    base_quat = robot.data.root_link_quat_w  # (N, 3)
-
-    joint_vel = robot.data.joint_vel  # (N, num_joints)
-
-    base_angvel = robot.data.root_com_ang_vel_w
-
-    com_pos = robot.data.root_link_pos_w  # (N, 3)
-    com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
-
-    ft_rew_dict = ft.ft_rew_info(com_pos, com_vel, jacs, body_pos_w, 
-                             base_quat, base_angvel, joint_vel, action)
-                             
-    ft_rew_dict["debug"]["applied_torque"] = robot.data.applied_torque
-    ft_rew_dict["debug"]["contact_mask"] = contact_mask
+def make_ft_rew_dict(robot, contact_mask, info):
+    ft_rew_dict = {
+        "applied_torque": robot.data.applied_torque,
+        "contact_mask": contact_mask,
+        "grf": info["f"],
+        "ff_tau": info["candidate_tau"],
+        "w": info["w"],
+        "des_com_vel": info["com_vel"],
+        "des_com_angvel": info["com_angvel"],
+    }
     return ft_rew_dict
 
 class FTActionManager(ActionManager):
     @property
     def total_action_dim(self) -> int:
         """Total action dimension."""
-        return 53 + ft.EEF_NUM
+        return 76 + ft.EEF_NUM
     
     def process_action(self, action: torch.Tensor):
         if self.total_action_dim != action.shape[1]:
@@ -176,7 +166,8 @@ class FTEnv(ManagerBasedRLEnv):
 
             self._sim_step_counter += 1
             # set actions into buffers
-            pos, torque = model_based_controller(self.scene["robot"], self.action_manager._action)
+            pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
+            
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
             # set actions into simulator
@@ -198,10 +189,9 @@ class FTEnv(ManagerBasedRLEnv):
             contact_sensor = self.scene.sensors[self.sensor_cfg.name]
             net_forces_w = contact_sensor.data.net_forces_w[:, self.sensor_cfg.body_ids]
             contact_mask = (torch.linalg.norm(net_forces_w, dim=-1) > 10.0)  # (N, |body_ids|)
-            print(net_forces_w.shape, self.sensor_cfg.body_ids)
             self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], 
-                                                self.action_manager._action,
-                                                contact_mask)
+                                                contact_mask,
+                                                info)
 
         # post-step:
         # -- update env counters (used for curriculum generation)

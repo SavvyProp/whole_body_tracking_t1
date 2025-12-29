@@ -86,7 +86,7 @@ def contact_state(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.T
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     net_forces_w = contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids]
     contact_mask = (torch.linalg.norm(net_forces_w, dim=-1) > threshold)  # (N, |body_ids|)
-    pred_contact_mask = torch.sigmoid(env.ft_rew_info["components"]["w"])
+    pred_contact_mask = torch.sigmoid(env.ft_rew_info["w"][:, 1:])
     lse = torch.sum(torch.square(contact_mask.float() - pred_contact_mask), dim=-1)
     return lse
 
@@ -95,7 +95,7 @@ def centroid_velocity(env: ManagerBasedRLEnv):
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, ["Trunk"])
     linvel = command.body_lin_vel_w[:, body_indexes][:, 0, :]
-    des_linvel = env.ft_rew_info["components"]["des_com_vel"][:, :3]
+    des_linvel = env.ft_rew_info["des_com_vel"][:, :3]
     lse = torch.sum(torch.square(linvel - des_linvel), dim=-1)
 
     linvel_rew = torch.exp(-lse / 0.25)
@@ -106,7 +106,7 @@ def centroid_angular_velocity(env: ManagerBasedRLEnv):
     command: MotionCommand = env.command_manager.get_term(command_name)
     body_indexes = _get_body_indexes(command, ["Trunk"])
     angvel = command.body_ang_vel_w[:, body_indexes][:, 0, :]
-    des_angvel = env.ft_rew_info["components"]["des_com_angvel"][:, :3]
+    des_angvel = env.ft_rew_info["des_com_angvel"][:, :3]
     lse = torch.sum(torch.square(angvel - des_angvel), dim=-1)
 
     linvel_rew = torch.exp(-lse / 3.14**2)
@@ -122,16 +122,11 @@ def ft_action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     remaining_l2_err = torch.sum(torch.square(remaining_component - remaining_prev), dim=1)
     return pos_l2_err + remaining_l2_err * 0.10
 
-def ft_torque_select(env: ManagerBasedRLEnv) -> torch.Tensor:
-    """Encourage the torque selection values to be close to 0 or 1."""
-    torque_select = env.ft_rew_info["components"]["torque_select"]
-    l2_err = torch.sum( torque_select, dim= -1)
-    return l2_err / 23
 
 def ft_force_correctness(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     net_forces_w = contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids]
-    pred_force = env.ft_rew_info["debug"]["f"]
+    pred_force = env.ft_rew_info["grf"]
     num_eef = pred_force.shape[1] // 6
     pred_force = pred_force.reshape(pred_force.shape[0], num_eef, 6)
     pred_lin_force = pred_force[:, :, :3]
@@ -142,9 +137,20 @@ def ft_force_correctness(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> 
 
 def ft_tau_ref(env: ManagerBasedRLEnv) -> torch.Tensor:
     applied_torque = env.scene["robot"].data.applied_torque
-    tau_ref = env.ft_rew_info["components"]["torque"][0, :, :]
-    # Reward for minimizing error between applied torque and tau_ref
+    tau_ref = env.ft_rew_info["ff_tau"]
+    # Reward for minimizing error between applied torque and ff torque
     frc_err = torch.sum(torch.square(applied_torque - tau_ref), dim=-1)
     sigma = 50
     exp_err = torch.exp(-frc_err / (sigma ** 2))
     return exp_err
+
+TORQUE_LIMITS = torch.tensor([
+    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 30, 30, 18, 18, 30, 30, 60, 60, 20, 20, 15, 15
+], device = "cuda")
+
+def ft_tau_limit(env: ManagerBasedRLEnv) -> torch.Tensor:
+    ff_torque = env.ft_rew_info["ff_tau"]
+    # Reward for staying within torque limits
+    over_limit = torch.relu(torch.abs(ff_torque) - TORQUE_LIMITS[None, :])
+    frc_err = torch.sum(torch.square(over_limit), dim=-1)
+    return frc_err

@@ -32,6 +32,8 @@ def ctrl2logits(act):
               CTRL_NUM * 2 + EEF_NUM + 3]
     des_com_angvel = act[:, CTRL_NUM * 2 + EEF_NUM + 3:
                 CTRL_NUM * 2 + EEF_NUM + 6]
+    torque_weight_logit = act[:, CTRL_NUM * 2 + EEF_NUM + 6:
+                              CTRL_NUM * 3 + EEF_NUM + 6]
     uc_w = act[:, -1:]
     logits = {
         "des_pos": des_pos,
@@ -39,7 +41,8 @@ def ctrl2logits(act):
         "des_com_angvel": des_com_angvel,
         "w": w,
         "torque": torque,
-        "uc_w": uc_w
+        "uc_w": uc_w,
+        "torque_weight_logit": torque_weight_logit
     }
     return logits
 
@@ -71,6 +74,13 @@ def ctrl2components(act, joint_vel):
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
     d_gain_angvel = 0.07
 
+    torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
+
+    # Prepend base (6-dof) weights of 1.0; keep batching/device/dtype consistent.
+    # torque_weight_logit is (N, CTRL_NUM) so torque_weight is (N, CTRL_NUM).
+    base_ones = torch.ones((torque_weight.shape[0], 6), device=torque_weight.device, dtype=torque_weight.dtype)
+    torque_weight = torch.cat([base_ones, torque_weight], dim=-1)  # (N, 6+CTRL_NUM)
+    
     return {
         "des_pos": des_pos,
         "des_com_vel": des_vel,
@@ -79,7 +89,8 @@ def ctrl2components(act, joint_vel):
         "torque": tau,
         "d_gain_lin": d_gain_lin,
         "d_gain_angvel": d_gain_angvel,
-        "uc_w": logits["uc_w"]
+        "uc_w": logits["uc_w"],
+        "torque_weight": torque_weight
     }
 
 def make_centroidal_ag(eefpos, com_pos):
@@ -151,15 +162,24 @@ def f_mag_q(w: torch.Tensor) -> torch.Tensor:
     qp_q = torch.diag_embed(diag_vec)                 # (N, E*6, E*6)
     return qp_q
 
-def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor):
+def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor, w: torch.Tensor | None = None):
     """
     jacs:    (N, 6*EEF_NUM, 6+CTRL_NUM) or (6*EEF_NUM, 6+CTRL_NUM)
     tau_ref: (N, CTRL_NUM)              or (CTRL_NUM,)
+    w:       Optional weights for ALL dofs (base+joint):
+             (N, 6+CTRL_NUM) or (6+CTRL_NUM,). Only the joint portion (last CTRL_NUM)
+             is used here since J_j excludes the 6 base dofs.
 
     Returns:
-      big_q:   (N, 6*EEF_NUM, 6*EEF_NUM) = J_j @ J_j^T
-      small_q: (N, 6*EEF_NUM)            = J_j @ tau_ref
+      big_q:   (N, 6*EEF_NUM, 6*EEF_NUM) = J_j @ W^2 @ J_j^T
+      small_q: (N, 6*EEF_NUM)            = J_j @ (W @ tau_ref)
     where J_j = -jacs[..., :, 6:]  (exclude the 6 base dofs)
+    and W is diagonal formed from w[..., 6:].
+
+    Notes:
+      Implemented without explicitly constructing W/diag matrices:
+        big_q = (J_j * wj) @ (J_j * wj)^T
+        small_q = J_j @ (tau_ref * wj)
     """
     device, dtype = jacs.device, jacs.dtype
 
@@ -175,9 +195,9 @@ def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor):
 
     # Normalize tau_ref to (N, CTRL)
     if tau_ref.dim() == 1:
-        tau_ref = tau_ref.unsqueeze(0)          # (1, CTRL)
+        tau_ref = tau_ref.unsqueeze(0)
     else:
-        tau_ref = tau_ref.reshape(-1, tau_ref.shape[-1])  # (N?, CTRL)
+        tau_ref = tau_ref.reshape(-1, tau_ref.shape[-1])
     tau_ref = tau_ref.to(device=device, dtype=dtype)
 
     if tau_ref.shape[-1] != CTRL:
@@ -189,11 +209,38 @@ def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor):
     elif tau_ref.shape[0] != N:
         raise ValueError(f"Batch mismatch: jacs batch {N} vs tau_ref batch {tau_ref.shape[0]}")
 
-    # big_q: (N, F, F)
-    big_q = J_j @ J_j.transpose(-1, -2)
+    # --- weights handling (optional) ---
+    # w is defined over (6+CTRL); only last CTRL apply to J_j columns.
+    if w is None:
+        # Unweighted case
+        big_q = J_j @ J_j.transpose(-1, -2)
+        small_q = torch.bmm(J_j, tau_ref.unsqueeze(-1)).squeeze(-1)
+        return big_q, small_q
 
-    # small_q: (N, F) using bmm to avoid broadcasting surprises
-    small_q = torch.bmm(J_j, tau_ref.unsqueeze(-1)).squeeze(-1)
+    # Normalize w to (N, 6+CTRL)
+    if w.dim() == 1:
+        w = w.unsqueeze(0)
+    else:
+        w = w.reshape(-1, w.shape[-1])
+    w = w.to(device=device, dtype=dtype)
+
+    if w.shape[-1] != 6 + CTRL:
+        raise ValueError(f"w dim mismatch: expected {6 + CTRL} but got {w.shape[-1]}")
+
+    if w.shape[0] == 1 and N > 1:
+        w = w.expand(N, -1)
+    elif w.shape[0] != N:
+        raise ValueError(f"Batch mismatch: jacs batch {N} vs w batch {w.shape[0]}")
+
+    wj = w[..., 6:]  # (N, CTRL)
+
+    # big_q = J_j @ W^2 @ J_j^T  == (J_j * wj) @ (J_j * wj)^T
+    Jw = J_j * wj.unsqueeze(-2)  # (N, F, CTRL)
+    big_q = Jw @ Jw.transpose(-1, -2)
+
+    # small_q = J_j @ (W @ tau_ref)  == J_j @ (tau_ref * wj)
+    tau_w = tau_ref * wj  # (N, CTRL)
+    small_q = torch.bmm(J_j, tau_w.unsqueeze(-1)).squeeze(-1)  # (N, F)
 
     return big_q, small_q
 
@@ -264,7 +311,7 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
 
 
 def ft_ref(
-    eefpos_, com_pos, jacs_, tau_ref, com_ref, w_, uc_w, debug = False
+    eefpos_, com_pos, jacs_, tau_ref, com_ref, w_, uc_w, torque_weight
 ):
     # Concat the unaccounted force component
     #unaccounted_weight = torch.exp(torch.clamp(uc_w, min=-8.0, max=8.0))  # (N,)
@@ -273,6 +320,7 @@ def ft_ref(
     unaccounted_jac = torch.zeros(
         (jacs_.shape[0], 6, ctrl_num + 6), device = jacs_.device
     )
+    unaccounted_jac[:, :6, :6] = torch.eye(6, device = jacs_.device)
     jacs = torch.cat([unaccounted_jac, jacs_], dim = 1)
     eefpos = torch.cat([
         com_pos[:, None, :], eefpos_
@@ -281,14 +329,15 @@ def ft_ref(
     w = torch.cat([
         unaccounted_weight, w_
     ], dim = 1)
-
     weights = torch.tensor([1e-3, 1e-2], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
     qp_q = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
     qp_q = qp_q * weights[0]
-    jt_q_big, jt_q_small = joint_torque_q(jacs, tau_ref)
+    jt_q_big, jt_q_small = joint_torque_q(jacs, tau_ref, torque_weight)
     jt_q_big = jt_q_big * weights[1]
+
+
 
     qp_q += jt_q_big
     qp_c = jt_q_small * weights[1]
@@ -320,10 +369,12 @@ def ft_ref(
     #tau = tau_ref * (1 - min_scaling_fac) + candidate_tau * min_scaling_fac
     tau = torch.clamp(candidate_tau, min=-TORQUE_LIMITS[None, :], max=TORQUE_LIMITS[None, :])
     f = f[:, 6:] # remove unaccounted force
-
-    if debug:
-        return tau, f
-    return tau
+    info = {
+        "f": f,
+        "candidate_tau": candidate_tau,
+        "w": w,
+    }
+    return tau, info
 
 def highlvlPD(base_quat, base_angvel, 
               lin_gain, angvel_gain,
@@ -338,6 +389,7 @@ def highlvlPD(base_quat, base_angvel,
     com_angvel = base_angvel
     ang_acc = angvel_gain * (global_des_angvel - com_angvel)
 
+
     return com_acc, ang_acc, global_des_vel, global_des_angvel
 
 def step(com_pos, com_vel,
@@ -346,7 +398,7 @@ def step(com_pos, com_vel,
          base_quat, base_angvel, joint_vel,
          action):
     comp_dict = ctrl2components(action, joint_vel)
-    com_acc, ang_acc, _, _ = highlvlPD(
+    com_acc, ang_acc, global_vel, global_angvel = highlvlPD(
         base_quat, base_angvel,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
         comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
@@ -357,16 +409,19 @@ def step(com_pos, com_vel,
     selected_jacs = jacs.index_select(1, idx)                 # (N, EEF_NUM, 6, D)
     jacs_ = selected_jacs.reshape(selected_jacs.size(0), -1, selected_jacs.size(-1))  # (N, 6*EEF_NUM, D)
     eefpos_ = eefpos.index_select(1, idx)                 # (N, EEF_NUM, 3)
-    tau = ft_ref(
+    tau, info = ft_ref(
         eefpos_, com_pos, jacs_,
         comp_dict["torque"],
         torch.cat([com_acc, ang_acc], dim=-1),
         comp_dict["w"],
-        comp_dict["uc_w"]
+        comp_dict["uc_w"],
+        comp_dict["torque_weight"]
     )
+    info["com_vel"] = global_vel
+    info["com_angvel"] = global_angvel
     #torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
     #tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
-    return comp_dict["des_pos"], tau
+    return comp_dict["des_pos"], tau, info
 
 try:
     jit_step = torch.compile(step)
@@ -374,45 +429,3 @@ try:
     # ft_ref = torch.compile(ft_ref, mode="max-autotune", fullgraph=False)
 except Exception as _e:
     print("[INFO] torch.compile disabled; using eager mode:", _e)
-
-def ft_rew_info(com_pos, com_vel,
-         jacs,
-         eefpos,
-         base_quat, base_angvel, joint_vel,
-         action):
-    logits = ctrl2logits(action)
-    comp_dict = ctrl2components(action, joint_vel)
-    com_acc, ang_acc, global_des_vel, global_des_angvel = highlvlPD(
-        base_quat, base_angvel,
-        comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
-        comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
-        com_vel, comp_dict["w"]
-    )
-
-    idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
-    selected_jacs = jacs.index_select(1, idx)                 # (N, EEF_NUM, 6, D)
-    jacs_ = selected_jacs.reshape(selected_jacs.size(0), -1, selected_jacs.size(-1))  # (N, 6*EEF_NUM, D)
-    eefpos_ = eefpos.index_select(1, idx)                 # (N, EEF_NUM, 3)
-    tau, f = ft_ref(
-        eefpos_, com_pos, jacs_,
-        comp_dict["torque"],
-        torch.cat([com_acc, ang_acc], dim=-1),
-        comp_dict["w"],
-        comp_dict["uc_w"], debug=True
-    )
-    debug_dict = {
-        "des_com_vel": global_des_vel,
-        "des_com_angvel": global_des_angvel,
-        "real_vel": com_vel,
-        "real_angvel": base_angvel,
-        "contact_w": torch.sigmoid(logits["w"]),
-        "ff_tau": tau.reshape(-1, CTRL_NUM),
-        "f": f,
-        "tau_ref": comp_dict["torque"][0, :, :],
-        "des_pos": logits["des_pos"],
-    }
-    return {
-        "debug": debug_dict,
-        "logits": ctrl2logits(action),
-        "components": ctrl2components(action, joint_vel)
-    }
