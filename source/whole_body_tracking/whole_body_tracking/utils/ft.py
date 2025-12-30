@@ -75,11 +75,11 @@ def ctrl2components(act, joint_vel):
     d_gain_angvel = 0.07
 
     #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
-
+    torque_weight = 1.0 / TORQUE_LIMITS
     # Prepend base (6-dof) weights of 1.0; keep batching/device/dtype consistent.
     # torque_weight_logit is (N, CTRL_NUM) so torque_weight is (N, CTRL_NUM).
-    #base_ones = torch.ones((torque_weight.shape[0], 6), device=torque_weight.device, dtype=torque_weight.dtype)
-    #torque_weight = torch.cat([base_ones, torque_weight], dim=-1)  # (N, 6+CTRL_NUM)
+    base_ones = torch.ones((6,), device=torque_weight.device, dtype=torque_weight.dtype)
+    torque_weight = torch.cat([base_ones, torque_weight], dim=-1)  # (N, 6+CTRL_NUM)
     
     return {
         "des_pos": des_pos,
@@ -90,7 +90,7 @@ def ctrl2components(act, joint_vel):
         "d_gain_lin": d_gain_lin,
         "d_gain_angvel": d_gain_angvel,
         "uc_w": logits["uc_w"],
-        "torque_weight": None
+        "torque_weight": torque_weight
     }
 
 def make_centroidal_ag(eefpos, com_pos):
@@ -329,12 +329,12 @@ def ft_ref(
     w = torch.cat([
         unaccounted_weight, w_
     ], dim = 1)
-    weights = torch.tensor([1e-3, 1e-2], device=eefpos.device)
+    weights = torch.tensor([1e-3, 1e0], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
     qp_q = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
     qp_q = qp_q * weights[0]
-    jt_q_big, jt_q_small = joint_torque_q(jacs, tau_ref, None)
+    jt_q_big, jt_q_small = joint_torque_q(jacs, tau_ref, torque_weight)
     jt_q_big = jt_q_big * weights[1]
 
 
@@ -415,7 +415,7 @@ def step(com_pos, com_vel,
         torch.cat([com_acc, ang_acc], dim=-1),
         comp_dict["w"],
         comp_dict["uc_w"],
-        comp_dict["torque_weight"]
+        comp_dict["torque_weight"],
     )
     info["com_vel"] = global_vel
     info["com_angvel"] = global_angvel
