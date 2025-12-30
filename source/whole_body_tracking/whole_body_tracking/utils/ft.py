@@ -76,10 +76,11 @@ def ctrl2components(act, joint_vel):
 
     #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
     torque_weight = 1.0 / TORQUE_LIMITS
+    torque_weight = torch.square(torque_weight)
     # Prepend base (6-dof) weights of 1.0; keep batching/device/dtype consistent.
     # torque_weight_logit is (N, CTRL_NUM) so torque_weight is (N, CTRL_NUM).
-    base_ones = torch.ones((6,), device=torque_weight.device, dtype=torque_weight.dtype)
-    torque_weight = torch.cat([base_ones * 0.01, torque_weight], dim=-1)  # (N, 6+CTRL_NUM)
+    base_ones = torch.ones((6,), device=torque_weight.device, dtype=torque_weight.dtype) * 1e-4
+    torque_weight = torch.cat([base_ones, torque_weight], dim=-1)  # (N, 6+CTRL_NUM)
     
     return {
         "des_pos": des_pos,
@@ -329,7 +330,7 @@ def ft_ref(
     w = torch.cat([
         unaccounted_weight, w_
     ], dim = 1)
-    weights = torch.tensor([1e-3, 1e0], device=eefpos.device)
+    weights = torch.tensor([1e-3, 1e2], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
