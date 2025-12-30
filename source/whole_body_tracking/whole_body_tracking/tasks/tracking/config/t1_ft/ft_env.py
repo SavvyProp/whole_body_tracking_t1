@@ -59,7 +59,7 @@ class FTActionManager(ActionManager):
     @property
     def total_action_dim(self) -> int:
         """Total action dimension."""
-        return 76 + ft.EEF_NUM
+        return 53 + ft.EEF_NUM
     
     def process_action(self, action: torch.Tensor):
         if self.total_action_dim != action.shape[1]:

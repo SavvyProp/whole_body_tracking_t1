@@ -32,8 +32,8 @@ def ctrl2logits(act):
               CTRL_NUM * 2 + EEF_NUM + 3]
     des_com_angvel = act[:, CTRL_NUM * 2 + EEF_NUM + 3:
                 CTRL_NUM * 2 + EEF_NUM + 6]
-    torque_weight_logit = act[:, CTRL_NUM * 2 + EEF_NUM + 6:
-                              CTRL_NUM * 3 + EEF_NUM + 6]
+    #torque_weight_logit = act[:, CTRL_NUM * 2 + EEF_NUM + 6:
+    #                         CTRL_NUM * 3 + EEF_NUM + 6]
     uc_w = act[:, -1:]
     logits = {
         "des_pos": des_pos,
@@ -42,7 +42,7 @@ def ctrl2logits(act):
         "w": w,
         "torque": torque,
         "uc_w": uc_w,
-        "torque_weight_logit": torque_weight_logit
+        "torque_weight_logit": None
     }
     return logits
 
@@ -74,12 +74,12 @@ def ctrl2components(act, joint_vel):
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
     d_gain_angvel = 0.07
 
-    torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
+    #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
 
     # Prepend base (6-dof) weights of 1.0; keep batching/device/dtype consistent.
     # torque_weight_logit is (N, CTRL_NUM) so torque_weight is (N, CTRL_NUM).
-    base_ones = torch.ones((torque_weight.shape[0], 6), device=torque_weight.device, dtype=torque_weight.dtype)
-    torque_weight = torch.cat([base_ones, torque_weight], dim=-1)  # (N, 6+CTRL_NUM)
+    #base_ones = torch.ones((torque_weight.shape[0], 6), device=torque_weight.device, dtype=torque_weight.dtype)
+    #torque_weight = torch.cat([base_ones, torque_weight], dim=-1)  # (N, 6+CTRL_NUM)
     
     return {
         "des_pos": des_pos,
@@ -90,7 +90,7 @@ def ctrl2components(act, joint_vel):
         "d_gain_lin": d_gain_lin,
         "d_gain_angvel": d_gain_angvel,
         "uc_w": logits["uc_w"],
-        "torque_weight": torque_weight
+        "torque_weight": None
     }
 
 def make_centroidal_ag(eefpos, com_pos):
@@ -334,7 +334,7 @@ def ft_ref(
 
     qp_q = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
     qp_q = qp_q * weights[0]
-    jt_q_big, jt_q_small = joint_torque_q(jacs, tau_ref, torque_weight)
+    jt_q_big, jt_q_small = joint_torque_q(jacs, tau_ref, None)
     jt_q_big = jt_q_big * weights[1]
 
 
