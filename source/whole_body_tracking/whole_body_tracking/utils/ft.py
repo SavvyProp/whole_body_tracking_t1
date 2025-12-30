@@ -171,14 +171,14 @@ def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor, w: torch.Tensor | 
              is used here since J_j excludes the 6 base dofs.
 
     Returns:
-      big_q:   (N, 6*EEF_NUM, 6*EEF_NUM) = J_j @ W^2 @ J_j^T
+      big_q:   (N, 6*EEF_NUM, 6*EEF_NUM) = J_j @ W @ J_j^T
       small_q: (N, 6*EEF_NUM)            = J_j @ (W @ tau_ref)
     where J_j = -jacs[..., :, 6:]  (exclude the 6 base dofs)
     and W is diagonal formed from w[..., 6:].
 
     Notes:
       Implemented without explicitly constructing W/diag matrices:
-        big_q = (J_j * wj) @ (J_j * wj)^T
+        big_q = (J_j * wj) @ (J_j)^T
         small_q = J_j @ (tau_ref * wj)
     """
     device, dtype = jacs.device, jacs.dtype
@@ -234,9 +234,9 @@ def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor, w: torch.Tensor | 
 
     wj = w[..., 6:]  # (N, CTRL)
 
-    # big_q = J_j @ W^2 @ J_j^T  == (J_j * wj) @ (J_j * wj)^T
+    # big_q = J_j @ W @ J_j^T  == (J_j * w_j) @ (J_j)^T
     Jw = J_j * wj.unsqueeze(-2)  # (N, F, CTRL)
-    big_q = Jw @ Jw.transpose(-1, -2)
+    big_q = Jw @ J_j.transpose(-1, -2)
 
     # small_q = J_j @ (W @ tau_ref)  == J_j @ (tau_ref * wj)
     tau_w = tau_ref * wj  # (N, CTRL)
@@ -329,17 +329,17 @@ def ft_ref(
     w = torch.cat([
         unaccounted_weight, w_
     ], dim = 1)
-    weights = torch.tensor([1e-3, 1e-1], device=eefpos.device)
+    weights = torch.tensor([1e-3, 1e0], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
-    qp_q = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
-    qp_q = qp_q * weights[0]
+    qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
+    qp_q_ = qp_q_ * weights[0]
+    
     jt_q_big, jt_q_small = joint_torque_q(jacs, tau_ref, torque_weight)
     jt_q_big = jt_q_big * weights[1]
 
 
-
-    qp_q += jt_q_big
+    qp_q = qp_q_ + jt_q_big
     qp_c = jt_q_small * weights[1]
 
     # Add additional optimization term for unaccounted forces
