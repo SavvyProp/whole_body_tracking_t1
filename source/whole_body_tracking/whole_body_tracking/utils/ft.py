@@ -66,10 +66,10 @@ def ctrl2components(act, joint_vel):
     torque_logit = torch.tanh(logits["torque"] * 0.5)
     torque_limits = TORQUE_LIMITS.to(torque_logit.device)
     tau_naive = torque_limits[None, :] * torque_logit
-    #spd_fac = torch.clip(torch.abs(joint_vel), min = 0.0, max = 10.0) / 10.0
-    #sign = torch.where(joint_vel * torque_logit >= 0, 1.0, 0.0)
-    #tau = tau_naive * (1.0 - spd_fac[None, :] * sign)
-    tau = tau_naive
+    spd_fac = torch.clip(torch.abs(joint_vel), min = 0.0, max = 10.0) / 10.0
+    sign = torch.where(joint_vel * torque_logit >= 0, 1.0, 0.0)
+    tau = tau_naive * (1.0 - spd_fac[None, :] * sign)
+    #tau = tau_naive
 
     d_gain_lin = 5.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
