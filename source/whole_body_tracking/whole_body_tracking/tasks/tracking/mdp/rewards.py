@@ -151,6 +151,8 @@ TORQUE_LIMITS = torch.tensor([
 def ft_tau_limit(env: ManagerBasedRLEnv) -> torch.Tensor:
     ff_torque = env.ft_rew_info["ff_tau"]
     # Reward for staying within torque limits
-    over_limit = torch.relu(torch.abs(ff_torque) - TORQUE_LIMITS[None, :])
+    soft_limit = 0.90
+    over_limit = torch.relu(torch.abs(ff_torque) - 
+                            soft_limit * TORQUE_LIMITS[None, :])
     frc_err = torch.sum(torch.square(over_limit), dim=-1)
     return frc_err

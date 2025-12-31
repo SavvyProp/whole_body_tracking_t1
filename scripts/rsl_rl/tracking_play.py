@@ -4,7 +4,7 @@
 
 import argparse
 import sys
-
+import numpy as np
 from isaaclab.app import AppLauncher
 
 # local imports
@@ -61,6 +61,12 @@ from isaaclab_tasks.utils.hydra import hydra_task_config
 import whole_body_tracking.tasks  # noqa: F401
 from whole_body_tracking.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
 
+body_names = [
+    "Trunk", "AL3", "AR3", "left_foot_link", "right_foot_link"
+]
+
+def _get_body_indexes(command, body_names: list[str] | None) -> list[int]:
+    return [i for i, name in enumerate(command.cfg.body_names) if (body_names is None) or (name in body_names)]
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
@@ -155,12 +161,21 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # reset environment
     obs, _ = env.get_observations()
     motion_cmd = env.unwrapped.command_manager.get_term("motion")
-    motion_cmd.time_steps = torch.zeros_like(motion_cmd.time_steps, 
-                                             device = motion_cmd.time_steps.device)
+    motion_cmd.time_steps = torch.ones_like(motion_cmd.time_steps, 
+                                             device = motion_cmd.time_steps.device) * 0
     #obs, _ = env.get_observations()
     timestep = 0
     # simulate environment
-    while simulation_app.is_running():
+    duration = env.unwrapped.command_manager.get_term("motion").motion.time_step_total - 1
+    
+    sim_pos = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+    sim_vel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+    sim_angvel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+    ref_pos = np.zeros((duration, 5, 3))
+    ref_vel = np.zeros((duration, 5, 3))
+    ref_angvel = np.zeros((duration, 5, 3))
+
+    for c in range(duration):
         # run everything in inference mode
         with torch.inference_mode():
             # agent stepping
@@ -170,21 +185,33 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             # env stepping
             obs, _, _, _ = env.step(actions)
         robot = env.unwrapped.scene["robot"]
+        command = env.unwrapped.command_manager.get_term("motion")
+        body_ids = _get_body_indexes(command, body_names)
+        sim_vel[c, :, :, :] = command.robot_body_lin_vel_w[:, body_ids].cpu().numpy()
+        sim_pos[c, :, :, :] = command.robot_body_pos_w[:, body_ids].cpu().numpy()
+        sim_angvel[c, :, :, :] = command.robot_body_ang_vel_w[:, body_ids].cpu().numpy()
+        ref_pos[c, :, :] = command.body_pos_w[:, body_ids][0, :, :].cpu().numpy()
+        ref_vel[c, :, :] = command.body_lin_vel_w[:, body_ids][0, :, :].cpu().numpy()
+        ref_angvel[c, :, :] = command.body_ang_vel_w[:, body_ids][0, :, :].cpu().numpy()
         #jnt_pos = obs["policy"][0, 61:84]
-        jnt_pos = robot.data.joint_pos[0, :]
-        action_ = actions[0, :]
-        print("Joint Positions:")
-        print(jnt_pos)
-        print("Actions:")
-        print(action_)
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
             if timestep == args_cli.video_length:
                 break
+    eval_name = "eval_data/ft_tracking_play_data.npz"
+    np.savez(eval_name, **{
+                           "sim_pos": sim_pos,
+                            "sim_vel": sim_vel,
+                            "sim_angvel": sim_angvel,
+                            "ref_pos": ref_pos,
+                            "ref_vel": ref_vel,
+                            "ref_angvel": ref_angvel,
+                           })
 
     # close the simulator
     env.close()
+
 
 
 if __name__ == "__main__":
