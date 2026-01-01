@@ -382,7 +382,7 @@ def step(com_pos, com_vel,
     return comp_dict["des_pos"], tau, info
 
 try:
-    jit_step = torch.compile(step)
+    jit_step = torch.compile(step, mode = "max-autotune", fullgraph = True)
     # You can also compile other hot helpers if desired:
     # ft_ref = torch.compile(ft_ref, mode="max-autotune", fullgraph=False)
 except Exception as _e:
