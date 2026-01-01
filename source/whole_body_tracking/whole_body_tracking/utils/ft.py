@@ -24,6 +24,7 @@ EEF_NUM = len(EEF_BODIES)
 
 EEF_IDS = [bodies.index(name) for name in EEF_BODIES]
 
+@torch.compile
 def ctrl2logits(act):
     des_pos = act[:, 0:CTRL_NUM]
     des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3]
@@ -44,6 +45,7 @@ def ctrl2logits(act):
     }
     return logits
 
+@torch.compile
 def ctrl2components(act, joint_vel):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
@@ -90,6 +92,7 @@ def ctrl2components(act, joint_vel):
         "torque_weight": torque_weight
     }
 
+@torch.compile
 def make_centroidal_ag(eefpos, com_pos):
     """
     Vectorized version of make_centroidal_ag without Python loops.
@@ -138,6 +141,7 @@ def make_centroidal_ag(eefpos, com_pos):
     g = eefpos.new_tensor([0.0, 0.0, -9.81, 0.0, 0.0, 0.0])  # (6,)
     return a, g
 
+@torch.compile
 def f_mag_q(w: torch.Tensor) -> torch.Tensor:
     # Accept (N, E) or (E,)
     if w.ndim == 1:
@@ -159,6 +163,7 @@ def f_mag_q(w: torch.Tensor) -> torch.Tensor:
     qp_q = torch.diag_embed(diag_vec)                 # (N, E*6, E*6)
     return qp_q
 
+@torch.compile
 def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor, w: torch.Tensor | None = None):
     """
     jacs:    (N, 6*EEF_NUM, 6+CTRL_NUM) or (6*EEF_NUM, 6+CTRL_NUM)
@@ -226,6 +231,7 @@ def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor, w: torch.Tensor | 
 
     return big_q, small_q
 
+@torch.compile
 def centroidal_qacc_cons(big_a, g, com_ref):
     lhs = big_a
     rhs = com_ref - g
@@ -382,7 +388,7 @@ def step(com_pos, com_vel,
     return comp_dict["des_pos"], tau, info
 
 try:
-    jit_step = torch.compile(step, mode = "max-autotune", fullgraph = True)
+    jit_step = torch.compile(step, mode = "max-autotune")
     # You can also compile other hot helpers if desired:
     # ft_ref = torch.compile(ft_ref, mode="max-autotune", fullgraph=False)
 except Exception as _e:
