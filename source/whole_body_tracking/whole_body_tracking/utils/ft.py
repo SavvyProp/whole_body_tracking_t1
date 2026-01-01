@@ -237,6 +237,7 @@ def centroidal_qacc_cons(big_a, g, com_ref):
     rhs = com_ref - g
     return lhs, rhs
 
+@torch.compile
 def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, cons_rhs: torch.Tensor, reg: float = 0.0):
     """
     qp_q:    (..., F, F)
