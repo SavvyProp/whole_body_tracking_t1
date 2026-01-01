@@ -290,7 +290,7 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
 
     rhs = torch.cat([c, b], dim=-1)                         # (..., F+M)
 
-    sol_all = torch.linalg.solve(KKT, rhs.unsqueeze(-1)).squeeze(-1)
+    sol_all = torch.linalg.solve_ex(KKT, rhs.unsqueeze(-1), check_errors = False).squeeze(-1)
 
     sol = sol_all[..., :F]                                   # (..., F)
 
