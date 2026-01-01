@@ -166,11 +166,13 @@ class FTEnv(ManagerBasedRLEnv):
 
             self._sim_step_counter += 1
             # set actions into buffers
+            st = time.perf_counter()
             pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
-            
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
+            print(f"[DEBUG] FT controller time: {time.perf_counter() - st:.6f} sec")
             # set actions into simulator
+            st = time.perf_counter()
             self.scene.write_data_to_sim()
             # simulate
             self.sim.step(render=False)
@@ -182,6 +184,7 @@ class FTEnv(ManagerBasedRLEnv):
                 self.sim.render()
             # update buffers at sim dt
             self.scene.update(dt=self.physics_dt)
+            print(f"[DEBUG] Physics step time: {time.perf_counter() - st:.6f} sec")
 
         with torch.no_grad():
             #action_ = action.clone()
