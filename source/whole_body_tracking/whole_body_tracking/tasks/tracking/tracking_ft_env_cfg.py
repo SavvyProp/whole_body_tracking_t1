@@ -149,6 +149,8 @@ class ObservationsCfg:
         joint_pos = ObsTerm(func=mdp.joint_pos_rel)
         joint_vel = ObsTerm(func=mdp.joint_vel_rel)
         actions = ObsTerm(func=mdp.last_action)
+        eef_frc = ObsTerm(func=mdp.eef_forces)
+        app_tau = ObsTerm(func=mdp.applied_torques)
 
     # observation groups
     policy: PolicyCfg = PolicyCfg()

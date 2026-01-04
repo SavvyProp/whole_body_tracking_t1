@@ -81,3 +81,19 @@ def motion_anchor_ori_b(env: ManagerBasedEnv, command_name: str) -> torch.Tensor
     )
     mat = matrix_from_quat(ori)
     return mat[..., :2].reshape(mat.shape[0], -1)
+
+from isaaclab.managers import SceneEntityCfg
+from whole_body_tracking.utils.ft import EEF_BODIES
+
+def eef_forces(env: ManagerBasedEnv) -> torch.Tensor:
+    sensor_cfg = SceneEntityCfg(
+                "contact_forces",
+                body_names=EEF_BODIES
+            )
+    contact_sensor = env.scene.sensors[sensor_cfg.name]
+    net_forces_w = contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids]
+    return net_forces_w.reshape(net_forces_w.shape[0], -1)
+
+def applied_torques(env: ManagerBasedEnv) -> torch.Tensor:
+    robot = env.scene["robot"]
+    return robot.data.applied_torque.reshape(robot.num_envs, -1)
