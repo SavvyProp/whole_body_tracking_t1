@@ -96,4 +96,4 @@ def eef_forces(env: ManagerBasedEnv) -> torch.Tensor:
 
 def applied_torques(env: ManagerBasedEnv) -> torch.Tensor:
     robot = env.scene["robot"]
-    return robot.data.applied_torque.reshape(robot.num_envs, -1)
+    return robot.data.applied_torque
