@@ -31,7 +31,7 @@ def model_based_controller(robot, action):
 
     joint_vel = robot.data.joint_vel  # (N, num_joints)
 
-    base_angvel = robot.data.root_com_ang_vel_b
+    base_angvel = robot.data.root_com_ang_vel_w
 
     com_pos = robot.data.root_link_pos_w  # (N, 3)
     com_vel = robot.data.root_link_vel_w[... , :3]  # (N, 3)

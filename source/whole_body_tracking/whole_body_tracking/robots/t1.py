@@ -642,6 +642,7 @@ for a in BOOSTER_T1_CFG.actuators.values():
     e = a.effort_limit_sim
     s = a.stiffness
     names = a.joint_names_expr
+    print("{}: {}".format(names, e))
     if not isinstance(e, dict):
         e = {n: e for n in names}
     if not isinstance(s, dict):

@@ -319,11 +319,6 @@ class RewardsCfg:
             ),
         }
     )
-    tau_ref = RewTerm(
-        func=mdp.ft_tau_ref,
-        weight=0.1,
-        params = {}
-    )
     tau_limit = RewTerm(
         func=mdp.ft_tau_limit,
         weight=-0.004,
@@ -358,6 +353,10 @@ class TerminationsCfg:
         },
     )
 
+@configclass
+class TerminationsEvalCfg:
+    """Termination terms for the MDP."""
+    time_out = DoneTerm(func=mdp.time_out, time_out=True)
 
 @configclass
 class CurriculumCfg:
@@ -415,7 +414,7 @@ class TrackingFTEnvEvalCfg(ManagerBasedRLEnvCfg):
     commands: CommandsCfg = CommandsCfg()
     # MDP settings
     rewards: RewardsCfg = RewardsCfg()
-    terminations: TerminationsCfg = TerminationsCfg()
+    terminations: TerminationsEvalCfg = TerminationsEvalCfg()
     events: EventEvalCfg = EventEvalCfg()
     curriculum: CurriculumCfg = CurriculumCfg()
 

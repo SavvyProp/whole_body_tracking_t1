@@ -51,7 +51,6 @@ def motion_relative_body_orientation_error_exp(
     )
     return torch.exp(-error.mean(-1) / std**2)
 
-
 def motion_global_body_linear_velocity_error_exp(
     env: ManagerBasedRLEnv, command_name: str, std: float, body_names: list[str] | None = None
 ) -> torch.Tensor:
@@ -145,7 +144,7 @@ def ft_tau_ref(env: ManagerBasedRLEnv) -> torch.Tensor:
     return exp_err
 
 TORQUE_LIMITS = torch.tensor([
-    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 30, 30, 18, 18, 30, 30, 60, 60, 20, 20, 15, 15
+    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 60, 60, 24, 24, 15, 15
 ], device = "cuda")
 
 def ft_tau_limit(env: ManagerBasedRLEnv) -> torch.Tensor:

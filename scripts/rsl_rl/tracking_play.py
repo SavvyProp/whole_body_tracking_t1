@@ -161,19 +161,25 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # reset environment
     obs, _ = env.get_observations()
     motion_cmd = env.unwrapped.command_manager.get_term("motion")
-    motion_cmd.time_steps = torch.ones_like(motion_cmd.time_steps, 
-                                             device = motion_cmd.time_steps.device) * 0
+    #motion_cmd.time_steps = torch.ones_like(motion_cmd.time_steps, 
+    #                                         device = motion_cmd.time_steps.device) * 0
+    all_envs = torch.arange(env_cfg.scene.num_envs, device=motion_cmd.time_steps.device, dtype = motion_cmd.time_steps.dtype)
+    motion_cmd.reset_command(all_envs)
     #obs, _ = env.get_observations()
     timestep = 0
     # simulate environment
     duration = env.unwrapped.command_manager.get_term("motion").motion.time_step_total - 1
-    
+    duration = min(duration, 10 * 50)
+
     sim_pos = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     sim_vel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     sim_angvel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
-    ref_pos = np.zeros((duration, 5, 3))
-    ref_vel = np.zeros((duration, 5, 3))
-    ref_angvel = np.zeros((duration, 5, 3))
+    ref_pos = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+    ref_vel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+    ref_angvel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+
+    sim_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 23))
+    sim_joint_torque = np.zeros((duration, env_cfg.scene.num_envs, 23))
 
     for c in range(duration):
         # run everything in inference mode
@@ -184,22 +190,26 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 actions = torch.reshape(actions, (1, -1))
             # env stepping
             obs, _, _, _ = env.step(actions)
-        robot = env.unwrapped.scene["robot"]
-        command = env.unwrapped.command_manager.get_term("motion")
-        body_ids = _get_body_indexes(command, body_names)
-        sim_vel[c, :, :, :] = command.robot_body_lin_vel_w[:, body_ids].cpu().numpy()
-        sim_pos[c, :, :, :] = command.robot_body_pos_w[:, body_ids].cpu().numpy()
-        sim_angvel[c, :, :, :] = command.robot_body_ang_vel_w[:, body_ids].cpu().numpy()
-        ref_pos[c, :, :] = command.body_pos_w[:, body_ids][0, :, :].cpu().numpy()
-        ref_vel[c, :, :] = command.body_lin_vel_w[:, body_ids][0, :, :].cpu().numpy()
-        ref_angvel[c, :, :] = command.body_ang_vel_w[:, body_ids][0, :, :].cpu().numpy()
+            robot = env.unwrapped.scene["robot"]
+            command = env.unwrapped.command_manager.get_term("motion")
+            print(command.time_steps)
+            
+            body_ids = _get_body_indexes(command, body_names)
+            sim_pos[c, :, :, :] = command.robot_body_pos_w[:, body_ids, :].cpu().numpy()
+            sim_vel[c, :, :, :] = command.robot_body_lin_vel_w[:, body_ids, :].cpu().numpy()
+            sim_angvel[c, :, :, :] = command.robot_body_ang_vel_w[:, body_ids, :].cpu().numpy()
+            ref_pos[c, :, :, :] = command.body_pos_w[:, body_ids, :].cpu().numpy()
+            ref_vel[c, :, :, :] = command.body_lin_vel_w[:, body_ids, :].cpu().numpy()
+            ref_angvel[c, :, :, :] = command.body_ang_vel_w[:, body_ids, :].cpu().numpy()
+            sim_joint_pos[c, :, :] = robot.data.joint_pos.cpu().numpy()
+            sim_joint_torque[c, :, :] = robot.data.applied_torque.cpu().numpy()
         #jnt_pos = obs["policy"][0, 61:84]
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
             if timestep == args_cli.video_length:
                 break
-    eval_name = "eval_data/ft_tracking_play_data.npz"
+    eval_name = "eval_data/tracking_play_data.npz"
     np.savez(eval_name, **{
                            "sim_pos": sim_pos,
                             "sim_vel": sim_vel,
@@ -207,6 +217,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                             "ref_pos": ref_pos,
                             "ref_vel": ref_vel,
                             "ref_angvel": ref_angvel,
+                            "joint_pos": sim_joint_pos,
+                            "joint_torque": sim_joint_torque,
                            })
 
     # close the simulator
