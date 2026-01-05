@@ -8,7 +8,7 @@ joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 
 CTRL_NUM = 23
 
 TORQUE_LIMITS = torch.tensor([
-    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 30, 30, 18, 18, 30, 30, 60, 60, 20, 20, 15, 15
+    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 60, 60, 24, 24, 15, 15
 ], device = "cuda")
 
 MASS = 31.614357
@@ -71,9 +71,9 @@ def ctrl2components(act, joint_vel):
     #tau = tau_naive * (1.0 - spd_fac[None, :] * sign)
     tau = tau_naive
 
-    d_gain_lin = 5.0
+    d_gain_lin = 2.5
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = 0.07
+    d_gain_angvel = 0.05
 
     #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
     torque_weight = 1.0 / TORQUE_LIMITS
@@ -148,7 +148,7 @@ def f_mag_q(w: torch.Tensor) -> torch.Tensor:
         w = w.unsqueeze(0)  # (1, E)
 
     # Same scaling as your original
-    logits    = -torch.clip(w, min=-6.0, max=6.0)  # (N, E)
+    logits    = -torch.clip(w, min=-10.0, max=10.0)  # (N, E)
     scale_lin = torch.exp(logits)                  # (N, E)
     scale_ang = scale_lin * 60.0                   # (N, E)
 
@@ -327,7 +327,7 @@ def ft_ref(
         com_pos[:, None, :], eefpos_
     ], dim = 1)
 
-    weights = torch.tensor([1e-3, 1e2], device=eefpos.device)
+    weights = torch.tensor([1e-2, 1e1], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
