@@ -238,24 +238,27 @@ def centroidal_qacc_cons(big_a, g, com_ref):
     return lhs, rhs
 
 @torch.compile
-def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, cons_rhs: torch.Tensor, reg: float = 0.0):
+def schur_solve(
+    qp_q: torch.Tensor,
+    qp_c: torch.Tensor,
+    cons_lhs: torch.Tensor,
+    cons_rhs: torch.Tensor,
+    reg: float = 1e-6,
+):
     """
-    qp_q:    (..., F, F)
-    qp_c:    (..., F)
-    cons_lhs:(..., M, F)   (A)
-    cons_rhs:(..., M)      (b)
+    qp_q:     (..., F, F)
+    qp_c:     (..., F)
+    cons_lhs: (..., M, F)   (A)
+    cons_rhs: (..., M)      (b)
 
     Returns:
-      sol:   (..., F)
+      x: (..., F)
     """
-    # Ensure common device/dtype
-    device = qp_q.device
-    dtype = qp_q.dtype
+    device, dtype = qp_q.device, qp_q.dtype
     qp_c = qp_c.to(device=device, dtype=dtype)
     cons_lhs = cons_lhs.to(device=device, dtype=dtype)
     cons_rhs = cons_rhs.to(device=device, dtype=dtype)
 
-    # Add batch dim if unbatched
     squeeze_out = False
     if qp_q.dim() == 2:
         qp_q = qp_q.unsqueeze(0)
@@ -271,36 +274,43 @@ def schur_solve(qp_q: torch.Tensor, qp_c: torch.Tensor, cons_lhs: torch.Tensor, 
     # Symmetrize Q
     Q = 0.5 * (qp_q + qp_q.transpose(-1, -2))
 
-    # Optional Tikhonov regularization on Q block
+    # Optional Tikhonov regularization on Q
     if reg > 0.0:
-        I_F = torch.eye(F, device=device, dtype=dtype).expand(*batch_shape, F, F)
-        Q = Q + reg * I_F
+        I = torch.eye(F, device=device, dtype=dtype).expand(*batch_shape, F, F)
+        Q = Q + reg * I
 
-    A = cons_lhs
-    c = qp_c
-    b = cons_rhs
+    A = cons_lhs                      # (..., M, F)
+    AT = A.transpose(-1, -2)          # (..., F, M)
+    c = qp_c                          # (..., F)
+    b = cons_rhs                      # (..., M)
 
-    # Build KKT = [[Q, A^T],
-    #              [A, 0   ]]
-    AT = A.transpose(-1, -2)                                # (..., F, M)
-    Z = Q.new_zeros(*batch_shape, M, M)                     # (..., M, M)
-    top = torch.cat([Q, AT], dim=-1)                        # (..., F, F+M)
-    bot = torch.cat([A, Z], dim=-1)                         # (..., M, F+M)
-    KKT = torch.cat([top, bot], dim=-2)                     # (..., F+M, F+M)
+    # Factor Q once: LU (works for indefinite too)
+    # torch.linalg.lu_factor_ex exists and avoids error-check overhead. :contentReference[oaicite:0]{index=0}
+    LU, pivots, infoQ = torch.linalg.lu_factor_ex(Q, pivot=True, check_errors=False)
 
-    rhs = torch.cat([c, b], dim=-1)                         # (..., F+M)
+    def solve_Q(B: torch.Tensor) -> torch.Tensor:
+        # solves Q X = B
+        return torch.linalg.lu_solve(LU, pivots, B)
 
-    out, _ = torch.linalg.solve_ex(KKT, rhs.unsqueeze(-1), check_errors=False)
-    sol_all = out.squeeze(-1)                      # (..., F+M)
-    
-    #sol_all = torch.linalg.solve_ex(KKT, rhs.unsqueeze(-1), check_errors = False).squeeze(-1)
+    # Compute Q^{-1} A^T and Q^{-1} c
+    Qinv_AT = solve_Q(AT)                              # (..., F, M)
+    Qinv_c = solve_Q(c.unsqueeze(-1)).squeeze(-1)      # (..., F)
 
-    sol = sol_all[..., :F]                                   # (..., F)
+    # Schur matrix S = A Q^{-1} A^T  and rhs = A Q^{-1} c - b
+    S = A @ Qinv_AT                                    # (..., M, M)
+    rhs_lam = (A @ Qinv_c.unsqueeze(-1)).squeeze(-1) - b   # (..., M)
+
+    # Solve for lambda (small MxM system)
+    # torch.linalg.solve_ex exists. :contentReference[oaicite:1]{index=1}
+    lam, _ = torch.linalg.solve_ex(S, rhs_lam.unsqueeze(-1), check_errors=False)
+    lam = lam.squeeze(-1)                              # (..., M)
+
+    # Recover x = Q^{-1}(c - A^T lambda)
+    x = solve_Q((c - (AT @ lam.unsqueeze(-1)).squeeze(-1)).unsqueeze(-1)).squeeze(-1)
 
     if squeeze_out:
-        sol = sol.squeeze(0)
-    return sol
-
+        x = x.squeeze(0)
+    return x
 
 def ft_ref(
     eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight
