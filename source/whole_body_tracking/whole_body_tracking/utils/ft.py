@@ -328,7 +328,7 @@ def ft_ref(
         com_pos[:, None, :], eefpos_
     ], dim = 1)
 
-    weights = torch.tensor([1e-2, 1e0], device=eefpos.device)
+    weights = torch.tensor([1e-1, 1e0], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)

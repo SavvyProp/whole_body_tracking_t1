@@ -321,9 +321,14 @@ class RewardsCfg:
             ),
         }
     )
+    tau_ref = RewTerm(
+        func=mdp.ft_tau_ref,
+        weight=0.1,
+        params = {}
+    )
     tau_limit = RewTerm(
         func=mdp.ft_tau_limit,
-        weight=-0.004,
+        weight=-0.005,
         params = {}
     )
 
