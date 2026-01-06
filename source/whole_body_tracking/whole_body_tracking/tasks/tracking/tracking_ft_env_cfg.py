@@ -291,7 +291,7 @@ class RewardsCfg:
     )
     contact_ft = RewTerm(
         func=mdp.contact_state,
-        weight=-0.5,
+        weight=-0.25,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
@@ -319,11 +319,11 @@ class RewardsCfg:
             ),
         }
     )
-    tau_ref = RewTerm(
-        func=mdp.ft_tau_ref,
-        weight=0.1,
-        params = {}
-    )
+    #tau_ref = RewTerm(
+    #    func=mdp.ft_tau_ref,
+    #    weight=0.1,
+    #    params = {}
+    #)
     tau_limit = RewTerm(
         func=mdp.ft_tau_limit,
         weight=-0.004,

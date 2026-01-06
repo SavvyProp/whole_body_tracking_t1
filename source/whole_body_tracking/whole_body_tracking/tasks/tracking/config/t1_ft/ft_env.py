@@ -33,9 +33,10 @@ def model_based_controller(robot, action):
 
     base_angvel = robot.data.root_com_ang_vel_b
 
-    com_pos = robot.data.root_link_pos_w  # (N, 3)
-    com_vel = robot.data.root_link_vel_w[... , :3]  # (N, 3)
-    #com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
+    #com_pos = robot.data.root_link_pos_w  # (N, 3)
+    com_pos = robot.data.root_com_pos_w  # (N, 3)
+    #com_vel = robot.data.root_link_vel_w[... , :3]  # (N, 3)
+    com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
     
     pos, ff_torque, info = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
