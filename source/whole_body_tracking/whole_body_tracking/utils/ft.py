@@ -71,9 +71,9 @@ def ctrl2components(act, joint_vel):
     #tau = tau_naive * (1.0 - spd_fac[None, :] * sign)
     tau = tau_naive
 
-    d_gain_lin = 1.0
+    d_gain_lin = 2.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = 0.01
+    d_gain_angvel = 0.025
 
     #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
     torque_weight = 1.0 / TORQUE_LIMITS
