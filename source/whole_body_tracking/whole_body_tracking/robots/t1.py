@@ -144,7 +144,9 @@ BOOSTER_T1_CFG = ArticulationCfg(
     },
 )
 
-BOOSTER_T1_LOW_GAIN_CFG = ArticulationCfg(
+FT_FAC = 0.5
+
+BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
         usd_path=f"{ASSET_DIR}/booster/t1/t1.usd",
         activate_contact_sensors=True,
@@ -210,17 +212,35 @@ BOOSTER_T1_LOW_GAIN_CFG = ArticulationCfg(
                 ".*_Knee_Pitch": 11.7,
                 "Waist": 10.88,
             },
-            stiffness=200.0,
-            damping=5.0,
-            armature=0.01,
+            armature = {
+                ".*_Hip_Pitch": ARMATURE_HIGH,
+                ".*_Hip_Roll": ARMATURE_MID,
+                ".*_Hip_Yaw": ARMATURE_MID,
+                ".*_Knee_Pitch": ARMATURE_HIGH,
+                "Waist": ARMATURE_MID,
+            },
+            stiffness = {
+                ".*_Hip_Pitch": STIFFNESS_HIGH * FT_FAC,
+                ".*_Hip_Roll": STIFFNESS_MID * FT_FAC,
+                ".*_Hip_Yaw": STIFFNESS_MID * FT_FAC,
+                ".*_Knee_Pitch": STIFFNESS_HIGH * FT_FAC,
+                "Waist": STIFFNESS_MID * FT_FAC,
+            },
+            damping = {
+                ".*_Hip_Pitch": DAMPING_HIGH * FT_FAC,
+                ".*_Hip_Roll": DAMPING_MID * FT_FAC,
+                ".*_Hip_Yaw": DAMPING_MID * FT_FAC,
+                ".*_Knee_Pitch": DAMPING_HIGH * FT_FAC,
+                "Waist": DAMPING_MID * FT_FAC,
+            }
         ),
         "feet": ImplicitActuatorCfg(
             joint_names_expr=[".*_Ankle_Pitch", ".*_Ankle_Roll"],
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
-            stiffness=50.0,
-            damping=1.0,
-            armature=0.01,
+            stiffness=STIFFNESS_LOW * FT_FAC,
+            damping=DAMPING_LOW * FT_FAC,
+            armature=ARMATURE_LOW,
         ),
         "arms": ImplicitActuatorCfg(
             joint_names_expr=[
@@ -231,16 +251,21 @@ BOOSTER_T1_LOW_GAIN_CFG = ArticulationCfg(
             ],
             effort_limit_sim=18.0,
             velocity_limit_sim=18.8,
-            stiffness=40.0,
-            damping=10.0,
-            armature=0.01,
+            stiffness=STIFFNESS_LOW * FT_FAC,
+            damping=DAMPING_LOW * FT_FAC,
+            armature=ARMATURE_LOW,
         ),
+        "head": ImplicitActuatorCfg(
+            joint_names_expr=["AAHead_yaw", "Head_pitch"],
+            effort_limit_sim=10.0,
+            velocity_limit_sim=10.0,
+            stiffness=STIFFNESS_LOW * FT_FAC,
+            damping=DAMPING_LOW * FT_FAC,
+            armature=ARMATURE_LOW,
+        )
     },
 )
 """Configuration for the Booster T1 Humanoid robot."""
-
-
-
 
 BOOSTER_T1_TT_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
@@ -650,7 +675,21 @@ for a in BOOSTER_T1_CFG.actuators.values():
         if n in e and n in s and s[n]:
             T1_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
 
+T1_LG_ACTION_SCALE = {}
+for a in BOOSTER_T1_LOWGAIN_CFG.actuators.values():
+    e = a.effort_limit_sim
+    s = a.stiffness
+    names = a.joint_names_expr
+    if not isinstance(e, dict):
+        e = {n: e for n in names}
+    if not isinstance(s, dict):
+        s = {n: s for n in names}
+    for n in names:
+        if n in e and n in s and s[n]:
+            T1_LG_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
+
 print("T1_ACTION_SCALE:", T1_ACTION_SCALE)
+print("T1_LG_ACTION_SCALE:", T1_LG_ACTION_SCALE)
 
 """Configuration for the Booster T1 Humanoid robot."""
 

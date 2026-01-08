@@ -1,6 +1,6 @@
 from isaaclab.utils import configclass
 
-from whole_body_tracking.robots.t1 import T1_ACTION_SCALE, BOOSTER_T1_CFG
+from whole_body_tracking.robots.t1 import T1_LG_ACTION_SCALE, BOOSTER_T1_LOWGAIN_CFG
 from whole_body_tracking.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
 from whole_body_tracking.tasks.tracking.tracking_ft_env_cfg import TrackingFTEnvCfg, TrackingFTEnvEvalCfg
 
@@ -10,8 +10,8 @@ class T1FTEnvCfg(TrackingFTEnvCfg):
     def __post_init__(self):
         super().__post_init__()
 
-        self.scene.robot = BOOSTER_T1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-        self.actions.joint_pos.scale = T1_ACTION_SCALE
+        self.scene.robot = BOOSTER_T1_LOWGAIN_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.actions.joint_pos.scale = T1_LG_ACTION_SCALE
         self.commands.motion.anchor_body_name = "Trunk"
         self.commands.motion.body_names = [
             "Trunk",
@@ -35,8 +35,8 @@ class T1FTEnvEvalCfg(TrackingFTEnvEvalCfg):
     def __post_init__(self):
         super().__post_init__()
 
-        self.scene.robot = BOOSTER_T1_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-        self.actions.joint_pos.scale = T1_ACTION_SCALE
+        self.scene.robot = BOOSTER_T1_LOWGAIN_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+        self.actions.joint_pos.scale = T1_LG_ACTION_SCALE
         self.commands.motion.anchor_body_name = "Trunk"
         self.commands.motion.body_names = [
             "Trunk",
