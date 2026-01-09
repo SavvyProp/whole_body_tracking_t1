@@ -22,7 +22,7 @@ def model_based_controller(robot, action):
     jacs = robot.root_physx_view.get_jacobians()
 
     cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_forces()
-    grav_nle = robot.root_physx_view.get_generalized_gravity_forces()
+    grav_nle = robot.root_physx_view.get_gravity_compensation_forces()
     nle = cor_nle + grav_nle
     
     # Base position (world): pos (3) + quat (4)
