@@ -168,7 +168,7 @@ class FTEnv(ManagerBasedRLEnv):
             self._sim_step_counter += 1
             # set actions into buffers
             #st = time.perf_counter()
-            if i % 2 == 0:
+            if i % 4 == 0:
                 pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
