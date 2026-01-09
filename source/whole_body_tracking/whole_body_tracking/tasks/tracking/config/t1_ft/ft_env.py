@@ -16,6 +16,16 @@ from whole_body_tracking.utils.ft import EEF_BODIES
 # ActionManager should have the big action size
 from isaaclab.managers import SceneEntityCfg
 
+def robot_dict(robot):
+    return {
+        "jacs": robot.root_physx_view.get_jacobians(),
+        "base_quat": robot.data.root_link_quat_w,
+        "joint_vel": robot.data.joint_vel,
+        "base_angvel": robot.data.root_com_ang_vel_b,
+        "com_pos": robot.data.root_com_pos_w,
+        "com_vel": robot.data.root_com_lin_vel_w,
+    }
+
 def model_based_controller(robot, action):
     body_pos_w = robot.data.body_pos_w
 
@@ -42,6 +52,12 @@ def model_based_controller(robot, action):
                              base_quat, base_angvel, joint_vel, action)
     #ff_torque = action[:, 23:46] * 0.05
     #ff_torque += nle
+    return pos, ff_torque, info
+
+def model_based_controller_dict(r_dict, action):
+    pos, ff_torque, info = ft.jit_step(r_dict["com_pos"], r_dict["com_vel"], r_dict["jacs"],
+                             r_dict["body_pos_w"], r_dict["base_quat"],
+                             r_dict["base_angvel"], r_dict["joint_vel"], action)
     return pos, ff_torque, info
 
 def make_ft_rew_dict(robot, contact_mask, info):
@@ -158,6 +174,7 @@ class FTEnv(ManagerBasedRLEnv):
         # note: checked here once to avoid multiple checks within the loop
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
         # perform physics stepping
+        r_dict = robot_dict(self.scene["robot"])
         for i in range(self.cfg.decimation):
             robot = self.scene["robot"]
             body_vel = robot.data.body_link_lin_vel_w[:, 0, :]
@@ -168,8 +185,8 @@ class FTEnv(ManagerBasedRLEnv):
             self._sim_step_counter += 1
             # set actions into buffers
             #st = time.perf_counter()
-            if i % 4 == 0:
-                pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
+            #pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
+            pos, torque, info = model_based_controller_dict(r_dict, self.action_manager._action)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
             #print(f"[DEBUG] FT controller time: {time.perf_counter() - st:.6f} sec")
