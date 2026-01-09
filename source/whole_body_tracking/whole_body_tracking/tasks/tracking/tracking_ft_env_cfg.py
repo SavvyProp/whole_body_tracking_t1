@@ -299,16 +299,16 @@ class RewardsCfg:
             ),
         }
     )
-    centroid_vel = RewTerm(
-        func=mdp.centroid_velocity,
-        weight=0.1,
-        params = {}
-    )
-    centroid_angvel = RewTerm(
-        func=mdp.centroid_angular_velocity,
-        weight=0.05,
-        params = {}
-    )
+    #centroid_vel = RewTerm(
+    #    func=mdp.centroid_velocity,
+    #    weight=0.1,
+    #    params = {}
+    #)
+    #centroid_angvel = RewTerm(
+    #    func=mdp.centroid_angular_velocity,
+    #    weight=0.05,
+    #    params = {}
+    #)
     force_correctness = RewTerm(
         func=mdp.ft_force_correctness,
         weight=0.15,

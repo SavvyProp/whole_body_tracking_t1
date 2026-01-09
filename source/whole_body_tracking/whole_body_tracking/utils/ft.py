@@ -71,9 +71,9 @@ def ctrl2components(act, joint_vel):
     #tau = tau_naive * (1.0 - spd_fac[None, :] * sign)
     tau = tau_naive
 
-    d_gain_lin = 2.0
+    d_gain_lin = 8.0 #2.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = 0.025
+    d_gain_angvel = 0.10 #0.025
 
     #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
     torque_weight = 1.0 / TORQUE_LIMITS
@@ -238,7 +238,6 @@ def centroidal_qacc_cons(big_a, g, com_ref):
     return lhs, rhs
 
 @torch.compile
-@torch.compile
 def schur_solve(
     qp_q: torch.Tensor,
     qp_c: torch.Tensor,
@@ -329,7 +328,7 @@ def ft_ref(
         com_pos[:, None, :], eefpos_
     ], dim = 1)
 
-    weights = torch.tensor([1e-2, 1e2], device=eefpos.device)
+    weights = torch.tensor([1e-3, 1e1], device=eefpos.device)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
@@ -369,7 +368,6 @@ def highlvlPD(base_quat, base_angvel,
 
     com_angvel = base_angvel
     ang_acc = angvel_gain * (global_des_angvel - com_angvel)
-
 
     return com_acc, ang_acc, global_des_vel, global_des_angvel
 
