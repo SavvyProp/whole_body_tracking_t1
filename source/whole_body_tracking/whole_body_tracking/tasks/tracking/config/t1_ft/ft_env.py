@@ -24,6 +24,7 @@ def robot_dict(robot):
         "base_angvel": robot.data.root_com_ang_vel_b,
         "com_pos": robot.data.root_com_pos_w,
         "com_vel": robot.data.root_com_lin_vel_w,
+        "body_pos_w": robot.data.body_pos_w,
     }
 
 def model_based_controller(robot, action):
