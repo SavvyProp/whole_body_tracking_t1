@@ -40,16 +40,16 @@ def model_based_controller(robot, action):
     
     base_quat = robot.data.root_link_quat_w  # (N, 3)
 
-    joint_vel = robot.data.joint_vel  # (N, num_joints)
+    #joint_vel = robot.data.joint_vel  # (N, num_joints)
 
-    base_angvel = robot.data.root_com_ang_vel_b
+    #base_angvel = robot.data.root_com_ang_vel_b
 
     #com_pos = robot.data.root_link_pos_w  # (N, 3)
     com_pos = robot.data.root_com_pos_w  # (N, 3)
     #com_vel = robot.data.root_link_vel_w[... , :3]  # (N, 3)
-    com_vel = robot.data.root_link_lin_vel_w  # (N, 3)
-    pos, ff_torque, info = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
-                             base_quat, base_angvel, joint_vel, action)
+    #com_vel = robot.data.root_link_lin_vel_w  # (N, 3)
+    pos, ff_torque, info = ft.jit_step(com_pos, jacs, body_pos_w, 
+                             base_quat, action)
     
     #ff_torque = action[:, 23:46] * 0.05
     #ff_torque += nle
@@ -68,8 +68,6 @@ def make_ft_rew_dict(robot, contact_mask, info):
         "grf": info["f"],
         "ff_tau": info["candidate_tau"],
         "w": info["w"],
-        "des_com_vel": info["com_vel"],
-        "des_com_angvel": info["com_angvel"],
     }
     return ft_rew_dict
 
@@ -175,11 +173,10 @@ class FTEnv(ManagerBasedRLEnv):
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
         # perform physics stepping
         #r_dict = robot_dict(self.scene["robot"])
+        pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
         for i in range(self.cfg.decimation):
             self._sim_step_counter += 1
             # set actions into buffers
-            
-            pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
             
             #r_dict["com_vel"] = self.scene["robot"].data.root_link_vel_w[... , :3]
             #r_dict["base_angvel"] = self.scene["robot"].data.root_com_ang_vel_b

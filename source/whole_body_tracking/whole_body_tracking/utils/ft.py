@@ -12,7 +12,7 @@ TORQUE_LIMITS = torch.tensor([
 ], device = "cuda")
 
 MASS = 31.614357
-SPHERE_RAD = 0.30
+SPHERE_RAD = 0.30  
 SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
 ANGULAR_INERTIA = torch.tensor(
     [[ SPHERE_MOI, 0.0, 0.0],
@@ -33,18 +33,18 @@ EEF_IDS = [bodies.index(name) for name in EEF_BODIES]
 @torch.compile
 def ctrl2logits(act):
     des_pos = act[:, 0:CTRL_NUM]
-    des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3]
+    des_com_acc = act[:, CTRL_NUM:CTRL_NUM + 3]
     w = act[:, CTRL_NUM + 3 : CTRL_NUM + EEF_NUM + 4]
     torque = act[:, CTRL_NUM + EEF_NUM + 4:
               CTRL_NUM * 2 + EEF_NUM + 4]
-    des_com_angvel = act[:, CTRL_NUM * 2 + EEF_NUM + 4:
+    des_com_angacc = act[:, CTRL_NUM * 2 + EEF_NUM + 4:
                 CTRL_NUM * 2 + EEF_NUM + 7]
     #torque_weight_logit = act[:, CTRL_NUM * 2 + EEF_NUM + 6:
     #                         CTRL_NUM * 3 + EEF_NUM + 6]
     logits = {
         "des_pos": des_pos,
-        "des_com_vel": des_com_vel,
-        "des_com_angvel": des_com_angvel,
+        "des_com_acc": des_com_acc,
+        "des_com_angacc": des_com_angacc,
         "w": w,
         "torque": torque,
         "torque_weight_logit": None
@@ -52,10 +52,10 @@ def ctrl2logits(act):
     return logits
 
 @torch.compile
-def ctrl2components(act, joint_vel):
+def ctrl2components(act):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
-    des_angvel = logits["des_com_angvel"] * 0.20
+    des_angacc = logits["des_com_angacc"] # * 0.20
     #des_angvel_mag = torch.norm(des_angvel, dim =-1, keepdim=True)
     #des_angvel_mag_clipped = torch.clamp(des_angvel_mag, max = 2.0)
     #des_angvel = des_angvel * (des_angvel_mag_clipped / (1e-6 + des_angvel_mag))
@@ -65,7 +65,7 @@ def ctrl2components(act, joint_vel):
     #des_vel_mag_clipped = torch.clamp(des_vel_mag, max = 3.0)
     #des_vel = des_com_vel * (des_vel_mag_clipped / (1e-6 + des_vel_mag))
     
-    des_vel = logits["des_com_vel"] * 0.25
+    des_acc = logits["des_com_acc"] # * 0.25
 
     w = logits["w"]
 
@@ -77,10 +77,8 @@ def ctrl2components(act, joint_vel):
     #tau = tau_naive * (1.0 - spd_fac[None, :] * sign)
     tau = tau_naive
 
-    d_gain_lin = 8.0 #2.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = 1.5 #0.025
-
+    
     #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
     torque_weight = 1.0 / TORQUE_LIMITS
     torque_weight = torch.square(torque_weight)
@@ -89,12 +87,10 @@ def ctrl2components(act, joint_vel):
     
     return {
         "des_pos": des_pos,
-        "des_com_vel": des_vel,
-        "des_com_angvel": des_angvel,
+        "des_com_acc": des_acc,
+        "des_com_angacc": des_angacc,
         "w": w,
         "torque": tau,
-        "d_gain_lin": d_gain_lin,
-        "d_gain_angvel": d_gain_angvel,
         "torque_weight": torque_weight
     }
 
@@ -362,32 +358,23 @@ def ft_ref(
     }
     return tau, info
 
-def highlvlPD(base_quat, base_angvel, 
-              lin_gain, angvel_gain,
-              des_vel, des_angvel,
-              com_vel, w):
+def highlvlPD(base_quat,  
+              des_acc, des_angacc,):
     q_wb = base_quat
-    global_des_vel = quat_apply(q_wb, des_vel)
-    global_des_angvel = quat_apply(q_wb, des_angvel)
+    global_des_acc = quat_apply(q_wb, des_acc)
+    global_des_angacc = quat_apply(q_wb, des_angacc)
+    
+    return global_des_acc, global_des_angacc
 
-    com_acc = lin_gain * (global_des_vel - com_vel)
-
-    com_angvel = base_angvel
-    ang_acc = angvel_gain * (global_des_angvel - com_angvel)
-
-    return com_acc, ang_acc, global_des_vel, global_des_angvel
-
-def step(com_pos, com_vel,
+def step(com_pos,
          jacs,
          eefpos,
-         base_quat, base_angvel, joint_vel,
+         base_quat,
          action):
-    comp_dict = ctrl2components(action, joint_vel)
-    com_acc, ang_acc, global_vel, global_angvel = highlvlPD(
-        base_quat, base_angvel,
-        comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
-        comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
-        com_vel, comp_dict["w"]
+    comp_dict = ctrl2components(action)
+    com_acc, ang_acc = highlvlPD(
+        base_quat,
+        comp_dict["des_com_acc"], comp_dict["des_com_angacc"],
     )
 
     idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
@@ -401,8 +388,6 @@ def step(com_pos, com_vel,
         comp_dict["w"],
         comp_dict["torque_weight"],
     )
-    info["com_vel"] = global_vel
-    info["com_angvel"] = global_angvel
     #torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
     #tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
     return comp_dict["des_pos"], tau, info
