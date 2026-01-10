@@ -12,10 +12,16 @@ TORQUE_LIMITS = torch.tensor([
 ], device = "cuda")
 
 MASS = 31.614357
+SPHERE_RAD = 0.30
+SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
 ANGULAR_INERTIA = torch.tensor(
-    [[ 2.77498525e+00,  5.36123413e-04,  2.12637797e-01],
- [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03],
- [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]], device = "cuda")
+    [[ SPHERE_MOI, 0.0, 0.0],
+     [ 0.0, SPHERE_MOI, 0.0],
+     [ 0.0, 0.0, SPHERE_MOI]], device = "cuda")
+#ANGULAR_INERTIA = torch.tensor(
+#    [[ 2.77498525e+00,  5.36123413e-04,  2.12637797e-01],
+# [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03],
+# [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]], device = "cuda")
 INV_ANGULAR_INERTIA = torch.linalg.inv(ANGULAR_INERTIA)
 
 EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
@@ -73,7 +79,7 @@ def ctrl2components(act, joint_vel):
 
     d_gain_lin = 8.0 #2.0
     #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    d_gain_angvel = 0.10 #0.025
+    d_gain_angvel = 1.5 #0.025
 
     #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
     torque_weight = 1.0 / TORQUE_LIMITS
@@ -150,7 +156,7 @@ def f_mag_q(w: torch.Tensor) -> torch.Tensor:
     # Same scaling as your original
     logits    = -torch.clip(w, min=-10.0, max=10.0)  # (N, E)
     scale_lin = torch.exp(logits)                  # (N, E)
-    scale_ang = scale_lin * 60.0                   # (N, E)
+    scale_ang = scale_lin * 10.0                   # (N, E)
 
     # Build per-effector 6-tuple = [lin, lin, lin, ang, ang, ang]
     # Shape: (N, E, 6) so each effector's 6 entries stay contiguous

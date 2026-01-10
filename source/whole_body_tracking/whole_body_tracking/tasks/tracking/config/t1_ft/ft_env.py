@@ -23,7 +23,7 @@ def robot_dict(robot):
         "joint_vel": robot.data.joint_vel,
         "base_angvel": robot.data.root_com_ang_vel_b,
         "com_pos": robot.data.root_com_pos_w,
-        "com_vel": robot.data.root_com_lin_vel_w,
+        "com_vel": robot.data.root_link_vel_w[... , :3],
         "body_pos_w": robot.data.body_pos_w,
     }
 
@@ -47,10 +47,10 @@ def model_based_controller(robot, action):
     #com_pos = robot.data.root_link_pos_w  # (N, 3)
     com_pos = robot.data.root_com_pos_w  # (N, 3)
     #com_vel = robot.data.root_link_vel_w[... , :3]  # (N, 3)
-    com_vel = robot.data.root_com_lin_vel_w  # (N, 3)
-    
+    com_vel = robot.data.root_link_lin_vel_w  # (N, 3)
     pos, ff_torque, info = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
+    
     #ff_torque = action[:, 23:46] * 0.05
     #ff_torque += nle
     return pos, ff_torque, info
@@ -101,7 +101,6 @@ class FTEnv(ManagerBasedRLEnv):
     def __init__(self, cfg: TrackingEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
         self.ft_rew_info = None  # placeholder for ft reward info
-        self.substep_vel = torch.zeros((cfg.decimation, cfg.scene.num_envs, 6), device=cfg.sim.device)
         self.sensor_cfg = SceneEntityCfg(
                 "contact_forces",
                 body_names=EEF_BODIES
@@ -177,16 +176,13 @@ class FTEnv(ManagerBasedRLEnv):
         # perform physics stepping
         #r_dict = robot_dict(self.scene["robot"])
         for i in range(self.cfg.decimation):
-            robot = self.scene["robot"]
-            body_vel = robot.data.body_link_lin_vel_w[:, 0, :]
-            body_angvel = robot.data.body_link_ang_vel_w[:, 0, :]
-            self.substep_vel[i, :, :3] = body_vel
-            self.substep_vel[i, :, 3:] = body_angvel
-
             self._sim_step_counter += 1
             # set actions into buffers
-            #st = time.perf_counter()
+            
             pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
+            
+            #r_dict["com_vel"] = self.scene["robot"].data.root_link_vel_w[... , :3]
+            #r_dict["base_angvel"] = self.scene["robot"].data.root_com_ang_vel_b
             #pos, torque, info = model_based_controller_dict(r_dict, self.action_manager._action)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
@@ -204,6 +200,7 @@ class FTEnv(ManagerBasedRLEnv):
                 self.sim.render()
             # update buffers at sim dt
             self.scene.update(dt=self.physics_dt)
+
             #print(f"[DEBUG] Physics step time: {time.perf_counter() - st:.6f} sec")
 
         with torch.no_grad():
