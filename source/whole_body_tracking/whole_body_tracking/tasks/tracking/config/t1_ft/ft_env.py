@@ -21,9 +21,7 @@ def robot_dict(robot):
         "jacs": robot.root_physx_view.get_jacobians(),
         "base_quat": robot.data.root_link_quat_w,
         "joint_vel": robot.data.joint_vel,
-        "base_angvel": robot.data.root_com_ang_vel_b,
         "com_pos": robot.data.root_com_pos_w,
-        "com_vel": robot.data.root_link_vel_w[... , :3],
         "body_pos_w": robot.data.body_pos_w,
     }
 
@@ -42,12 +40,12 @@ def model_based_controller(robot, action):
 
     joint_vel = robot.data.joint_vel  # (N, num_joints)
 
-    base_angvel = robot.data.root_com_ang_vel_b
+    base_angvel = robot.data.root_com_ang_vel_w
 
     #com_pos = robot.data.root_link_pos_w  # (N, 3)
     com_pos = robot.data.root_com_pos_w  # (N, 3)
-    #com_vel = robot.data.root_link_vel_w[... , :3]  # (N, 3)
-    com_vel = robot.data.root_link_lin_vel_w  # (N, 3)
+    com_vel = robot.data.root_lin_vel_w  # (N, 3)
+    #com_vel = robot.data.root_link_lin_vel_w  # (N, 3)
     pos, ff_torque, info = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
                              base_quat, base_angvel, joint_vel, action)
     
@@ -70,6 +68,8 @@ def make_ft_rew_dict(robot, contact_mask, info):
         "w": info["w"],
         "des_com_vel": info["com_vel"],
         "des_com_angvel": info["com_angvel"],
+        "com_acc": info["com_acc"],
+        "com_angacc": info["com_angacc"],
     }
     return ft_rew_dict
 
@@ -174,16 +174,16 @@ class FTEnv(ManagerBasedRLEnv):
         # note: checked here once to avoid multiple checks within the loop
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
         # perform physics stepping
-        #r_dict = robot_dict(self.scene["robot"])
+        r_dict = robot_dict(self.scene["robot"])
         for i in range(self.cfg.decimation):
             self._sim_step_counter += 1
             # set actions into buffers
             
-            pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
+            #pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
             
-            #r_dict["com_vel"] = self.scene["robot"].data.root_link_vel_w[... , :3]
-            #r_dict["base_angvel"] = self.scene["robot"].data.root_com_ang_vel_b
-            #pos, torque, info = model_based_controller_dict(r_dict, self.action_manager._action)
+            r_dict["com_vel"] = self.scene["robot"].data.root_lin_vel_w
+            r_dict["base_angvel"] = self.scene["robot"].data.root_com_ang_vel_w
+            pos, torque, info = model_based_controller_dict(r_dict, self.action_manager._action)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
             #print(f"[DEBUG] FT controller time: {time.perf_counter() - st:.6f} sec")

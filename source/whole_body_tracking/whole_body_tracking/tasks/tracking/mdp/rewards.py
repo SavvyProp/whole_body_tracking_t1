@@ -144,15 +144,32 @@ def ft_tau_ref(env: ManagerBasedRLEnv) -> torch.Tensor:
     exp_err = torch.exp(-frc_err / (sigma ** 2))
     return exp_err
 
-TORQUE_LIMITS = torch.tensor([
-    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 60, 60, 24, 24, 15, 15
-], device = "cuda")
+TORQUE_LIMITS = torch.tensor(
+    [7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 60, 60, 24, 24, 15, 15],
+    dtype=torch.float32,
+)
+
 
 def ft_tau_limit(env: ManagerBasedRLEnv) -> torch.Tensor:
     ff_torque = env.ft_rew_info["ff_tau"]
     # Reward for staying within torque limits
     soft_limit = 0.90
-    over_limit = torch.relu(torch.abs(ff_torque) - 
-                            soft_limit * TORQUE_LIMITS[None, :])
+
+    torque_limits = TORQUE_LIMITS.to(device=ff_torque.device, dtype=ff_torque.dtype)
+    over_limit = torch.relu(torch.abs(ff_torque) - soft_limit * torque_limits[None, :])
     frc_err = torch.sum(torch.square(over_limit), dim=-1)
     return frc_err
+
+def com_acc_magnitude(env: ManagerBasedRLEnv) -> torch.Tensor:
+    com_acc = env.ft_rew_info["com_acc"]
+    acc_mag = torch.linalg.norm(com_acc, dim=-1)
+    acc_limit = 1.5
+    over_limit = torch.relu(acc_mag - acc_limit)
+    return over_limit
+
+def com_angacc_magnitude(env: ManagerBasedRLEnv) -> torch.Tensor:
+    com_angacc = env.ft_rew_info["com_angacc"]
+    angacc_mag = torch.linalg.norm(com_angacc, dim=-1)
+    angacc_limit = 3.0
+    over_limit = torch.relu(angacc_mag - angacc_limit)
+    return over_limit

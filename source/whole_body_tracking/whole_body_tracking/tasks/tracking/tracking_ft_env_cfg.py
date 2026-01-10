@@ -330,6 +330,18 @@ class RewardsCfg:
         params = {}
     )
 
+    acc_mag = RewTerm(
+        func=mdp.com_acc_magnitude,
+        weight=-0.1,
+        params = {}
+    )
+
+    angacc_mag = RewTerm(
+        func=mdp.com_angacc_magnitude,
+        weight=-0.1,
+        params = {}
+    )
+
 
 @configclass
 class TerminationsCfg:
