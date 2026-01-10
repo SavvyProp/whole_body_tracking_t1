@@ -7,25 +7,24 @@ joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 
 
 CTRL_NUM = 23
 
+# NOTE:
+# Keep constants device-agnostic (CPU by default). Move to the active device/dtype
+# inside compiled functions to avoid cross-GPU issues with torch.compile / Dynamo.
 TORQUE_LIMITS = torch.tensor([
     7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 60, 60, 24, 24, 15, 15
-], device = "cuda")
+], dtype=torch.float32)
 
 MASS = 31.614357
-SPHERE_RAD = 0.30  
+SPHERE_RAD = 0.30
 SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
 ANGULAR_INERTIA = torch.tensor(
-    [[ SPHERE_MOI, 0.0, 0.0],
-     [ 0.0, SPHERE_MOI, 0.0],
-     [ 0.0, 0.0, SPHERE_MOI]], device = "cuda")
-#ANGULAR_INERTIA = torch.tensor(
-#    [[ 2.77498525e+00,  5.36123413e-04,  2.12637797e-01],
-# [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03],
-# [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]], device = "cuda")
-INV_ANGULAR_INERTIA = torch.linalg.inv(ANGULAR_INERTIA)
+    [[SPHERE_MOI, 0.0, 0.0],
+     [0.0, SPHERE_MOI, 0.0],
+     [0.0, 0.0, SPHERE_MOI]],
+    dtype=torch.float32,
+)
 
 EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
-#EEF_BODIES = ['AL2', 'AR2', 'AL3', 'AR3', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
 EEF_NUM = len(EEF_BODIES)
 
 EEF_IDS = [bodies.index(name) for name in EEF_BODIES]
@@ -39,8 +38,6 @@ def ctrl2logits(act):
               CTRL_NUM * 2 + EEF_NUM + 4]
     des_com_angacc = act[:, CTRL_NUM * 2 + EEF_NUM + 4:
                 CTRL_NUM * 2 + EEF_NUM + 7]
-    #torque_weight_logit = act[:, CTRL_NUM * 2 + EEF_NUM + 6:
-    #                         CTRL_NUM * 3 + EEF_NUM + 6]
     logits = {
         "des_pos": des_pos,
         "des_com_acc": des_com_acc,
@@ -56,34 +53,19 @@ def ctrl2components(act):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
     des_angacc = logits["des_com_angacc"] # * 0.20
-    #des_angvel_mag = torch.norm(des_angvel, dim =-1, keepdim=True)
-    #des_angvel_mag_clipped = torch.clamp(des_angvel_mag, max = 2.0)
-    #des_angvel = des_angvel * (des_angvel_mag_clipped / (1e-6 + des_angvel_mag))
-    
-    #des_com_vel = logits["des_com_vel"] * 0.05
-    #des_vel_mag = torch.norm(des_com_vel, dim =-1, keepdim=True)
-    #des_vel_mag_clipped = torch.clamp(des_vel_mag, max = 3.0)
-    #des_vel = des_com_vel * (des_vel_mag_clipped / (1e-6 + des_vel_mag))
     
     des_acc = logits["des_com_acc"] # * 0.25
 
     w = logits["w"]
 
     torque_logit = torch.tanh(logits["torque"] * 0.5)
-    torque_limits = TORQUE_LIMITS.to(torque_logit.device)
+    torque_limits = TORQUE_LIMITS.to(device=torque_logit.device, dtype=torque_logit.dtype)
     tau_naive = torque_limits[None, :] * torque_logit
-    #spd_fac = torch.clip(torch.abs(joint_vel), min = 0.0, max = 10.0) / 10.0
-    #sign = torch.where(joint_vel * torque_logit >= 0, 1.0, 0.0)
-    #tau = tau_naive * (1.0 - spd_fac[None, :] * sign)
     tau = tau_naive
 
-    #d_gain_lin = jnp.tanh(logits["d_gain"][0]) * 6.0 + 7.0
-    
-    #torque_weight = torch.exp(torch.clip(logits["torque_weight_logit"], -6.0, 6.0))
-    torque_weight = 1.0 / TORQUE_LIMITS
+    # Create torque weights on the same device/dtype as runtime tensors.
+    torque_weight = (1.0 / torque_limits)
     torque_weight = torch.square(torque_weight)
-    # Prepend base (6-dof) weights of 1.0; keep batching/device/dtype consistent.
-    # torque_weight_logit is (N, CTRL_NUM) so torque_weight is (N, CTRL_NUM).
     
     return {
         "des_pos": des_pos,
@@ -122,7 +104,9 @@ def make_centroidal_ag(eefpos, com_pos):
     S[..., 2, 1] =  rx
 
     # invI: (N, 1, 3, 3) broadcast over E
-    invI = INV_ANGULAR_INERTIA.to(device=device, dtype=dtype).expand(N, -1, -1).unsqueeze(1)
+    invI_single = torch.linalg.inv(ANGULAR_INERTIA.to(device=device, dtype=dtype))
+    #invI_single = 1.0 / ANGULAR_INERTIA.to(device=device, dtype=dtype)
+    invI = invI_single.expand(N, -1, -1).unsqueeze(1)
 
     # Bottom block per effector: [invI @ S, invI] -> (N, E, 3, 6)
     bot_left = invI @ S                         # (N, E, 3, 3)
@@ -213,15 +197,26 @@ def joint_torque_q(jacs: torch.Tensor, tau_ref: torch.Tensor, w: torch.Tensor | 
     elif tau_ref.shape[0] != N:
         raise ValueError(f"Batch mismatch: jacs batch {N} vs tau_ref batch {tau_ref.shape[0]}")
 
-    # --- weights handling (optional) ---
-    # w is defined over (6+CTRL); only last CTRL apply to J_j columns.
     if w is None:
         # Unweighted case
         big_q = J_j @ J_j.transpose(-1, -2)
         small_q = torch.bmm(J_j, tau_ref.unsqueeze(-1)).squeeze(-1)
         return big_q, small_q
 
-    wj = w  # (N, CTRL)
+    # Ensure weights are on the same device/dtype and have shape (N, CTRL)
+    if w.dim() == 1:
+        wj = w.unsqueeze(0)
+    else:
+        wj = w.reshape(-1, w.shape[-1])
+    wj = wj.to(device=device, dtype=dtype)
+
+    if wj.shape[0] == 1 and N > 1:
+        wj = wj.expand(N, -1)
+    elif wj.shape[0] != N:
+        raise ValueError(f"Batch mismatch: jacs batch {N} vs w batch {wj.shape[0]}")
+
+    if wj.shape[-1] != CTRL:
+        raise ValueError(f"Weight dim mismatch: J_j has {CTRL} but w has {wj.shape[-1]}")
 
     # big_q = J_j @ W @ J_j^T  == (J_j * w_j) @ (J_j)^T
     Jw = J_j * wj.unsqueeze(-2)  # (N, F, CTRL)
@@ -287,7 +282,6 @@ def schur_solve(
     b = cons_rhs                      # (..., M)
 
     # Factor Q once: LU (works for indefinite too)
-    # torch.linalg.lu_factor_ex exists and avoids error-check overhead. :contentReference[oaicite:0]{index=0}
     LU, pivots, infoQ = torch.linalg.lu_factor_ex(Q, pivot=True, check_errors=False)
 
     def solve_Q(B: torch.Tensor) -> torch.Tensor:
@@ -303,7 +297,6 @@ def schur_solve(
     rhs_lam = (A @ Qinv_c.unsqueeze(-1)).squeeze(-1) - b   # (..., M)
 
     # Solve for lambda (small MxM system)
-    # torch.linalg.solve_ex exists. :contentReference[oaicite:1]{index=1}
     lam, _ = torch.linalg.solve_ex(S, rhs_lam.unsqueeze(-1), check_errors=False)
     lam = lam.squeeze(-1)                              # (..., M)
 
@@ -319,7 +312,6 @@ def ft_ref(
     eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight
 ):
     # Concat the unaccounted force component
-    #unaccounted_weight = torch.exp(torch.clamp(uc_w, min=-8.0, max=8.0))  # (N,)
     ctrl_num = tau_ref.shape[-1]
     unaccounted_jac = torch.zeros(
         (jacs_.shape[0], 6, ctrl_num + 6), device = jacs_.device
@@ -330,7 +322,7 @@ def ft_ref(
         com_pos[:, None, :], eefpos_
     ], dim = 1)
 
-    weights = torch.tensor([1e-3, 1e1], device=eefpos.device)
+    weights = torch.tensor([1e-3, 1e1], device=eefpos.device, dtype=eefpos.dtype)
     a, g = make_centroidal_ag(eefpos, com_pos)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
@@ -349,7 +341,8 @@ def ft_ref(
     candidate_tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
 
-    tau = torch.clamp(candidate_tau, min=-TORQUE_LIMITS[None, :], max=TORQUE_LIMITS[None, :])
+    torque_limits = TORQUE_LIMITS.to(device=candidate_tau.device, dtype=candidate_tau.dtype)
+    tau = torch.clamp(candidate_tau, min=-torque_limits[None, :], max=torque_limits[None, :])
     f = f[:, 6:] # remove unaccounted force
     info = {
         "f": f,
@@ -388,13 +381,9 @@ def step(com_pos,
         comp_dict["w"],
         comp_dict["torque_weight"],
     )
-    #torque_limits = TORQUE_LIMITS.to(tau.device, tau.dtype)
-    #tau = torch.clamp(tau, min=-torque_limits[None, :], max=torque_limits[None, :])
     return comp_dict["des_pos"], tau, info
 
 try:
     jit_step = torch.compile(step)
-    # You can also compile other hot helpers if desired:
-    # ft_ref = torch.compile(ft_ref, mode="max-autotune", fullgraph=False)
 except Exception as _e:
     print("[INFO] torch.compile disabled; using eager mode:", _e)
