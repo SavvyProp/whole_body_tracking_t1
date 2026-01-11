@@ -174,16 +174,16 @@ class FTEnv(ManagerBasedRLEnv):
         # note: checked here once to avoid multiple checks within the loop
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
         # perform physics stepping
-        r_dict = robot_dict(self.scene["robot"])
+        #r_dict = robot_dict(self.scene["robot"])
         for i in range(self.cfg.decimation):
             self._sim_step_counter += 1
             # set actions into buffers
             
-            #pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
+            pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
             
-            r_dict["com_vel"] = self.scene["robot"].data.root_lin_vel_w
-            r_dict["base_angvel"] = self.scene["robot"].data.root_com_ang_vel_w
-            pos, torque, info = model_based_controller_dict(r_dict, self.action_manager._action)
+            #r_dict["com_vel"] = self.scene["robot"].data.root_lin_vel_w
+            #r_dict["base_angvel"] = self.scene["robot"].data.root_com_ang_vel_w
+            #pos, torque, info = model_based_controller_dict(r_dict, self.action_manager._action)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
             #print(f"[DEBUG] FT controller time: {time.perf_counter() - st:.6f} sec")
