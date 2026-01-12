@@ -15,48 +15,45 @@ from whole_body_tracking.utils.ft import EEF_BODIES
 # Implementation note: build a custom ActionManager with overriden action size
 # ActionManager should have the big action size
 from isaaclab.managers import SceneEntityCfg
+from isaaclab.utils.math import quat_from_angle_axis, quat_mul
 
 def robot_dict(robot):
     return {
         "jacs": robot.root_physx_view.get_jacobians(),
         "base_quat": robot.data.root_link_quat_w,
-        "joint_vel": robot.data.joint_vel,
         "com_pos": robot.data.root_com_pos_w,
         "body_pos_w": robot.data.body_pos_w,
+        "body_vel_w": robot.data.body_vel_w,
     }
 
 def model_based_controller(robot, action):
     body_pos_w = robot.data.body_pos_w
-
-    jacs = robot.root_physx_view.get_jacobians()
-
-    #cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_compensation_forces()[:, 6:]
-    #grav_nle = robot.root_physx_view.get_gravity_compensation_forces()[:, 6:]
-    #nle = cor_nle + grav_nle
-    
-    # Base position (world): pos (3) + quat (4)
-    
+    jacs = robot.root_physx_view.get_jacobians()    
     base_quat = robot.data.root_link_quat_w  # (N, 3)
-
-    joint_vel = robot.data.joint_vel  # (N, num_joints)
-
     base_angvel = robot.data.root_com_ang_vel_w
-
-    #com_pos = robot.data.root_link_pos_w  # (N, 3)
     com_pos = robot.data.root_com_pos_w  # (N, 3)
     com_vel = robot.data.root_lin_vel_w  # (N, 3)
-    #com_vel = robot.data.root_link_lin_vel_w  # (N, 3)
     pos, ff_torque, info = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
-                             base_quat, base_angvel, joint_vel, action)
+                             base_quat, base_angvel, action)
     
-    #ff_torque = action[:, 23:46] * 0.05
-    #ff_torque += nle
     return pos, ff_torque, info
 
-def model_based_controller_dict(r_dict, action):
-    pos, ff_torque, info = ft.jit_step(r_dict["com_pos"], r_dict["com_vel"], r_dict["jacs"],
-                             r_dict["body_pos_w"], r_dict["base_quat"],
-                             r_dict["base_angvel"], r_dict["joint_vel"], action)
+def model_based_controller_dict(robot, r_dict, action, physics_dt = 0.005):
+    com_vel = robot.data.root_lin_vel_w  # (N, 3)
+    base_angvel = robot.data.root_com_ang_vel_w
+    com_pos = r_dict["com_pos"]
+    body_pos_w = r_dict["body_pos_w"]
+    base_quat = r_dict["base_quat"]
+    pos, ff_torque, info = ft.jit_step(com_pos, com_vel, r_dict["jacs"],
+                             body_pos_w, base_quat,
+                             base_angvel, action)
+    # Update values in r_dict
+    r_dict["com_pos"] = com_pos + com_vel * physics_dt
+    r_dict["body_pos_w"] = body_pos_w + r_dict["body_vel_w"] * physics_dt
+    rot_mag = torch.linalg.norm(base_angvel, dim=-1, keepdim=False) + 1e-8
+    axis = base_angvel / rot_mag[..., None]
+    small_quat = quat_from_angle_axis(rot_mag * physics_dt, axis)
+    r_dict["base_quat"] = quat_mul(small_quat, base_quat)
     return pos, ff_torque, info
 
 def make_ft_rew_dict(robot, contact_mask, info):
@@ -174,16 +171,19 @@ class FTEnv(ManagerBasedRLEnv):
         # note: checked here once to avoid multiple checks within the loop
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
         # perform physics stepping
-        #r_dict = robot_dict(self.scene["robot"])
+        r_dict = robot_dict(self.scene["robot"])
         for i in range(self.cfg.decimation):
             self._sim_step_counter += 1
             # set actions into buffers
             
-            pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
+            #pos, torque, info = model_based_controller(self.scene["robot"], self.action_manager._action)
             
             #r_dict["com_vel"] = self.scene["robot"].data.root_lin_vel_w
             #r_dict["base_angvel"] = self.scene["robot"].data.root_com_ang_vel_w
-            #pos, torque, info = model_based_controller_dict(r_dict, self.action_manager._action)
+            pos, torque, info = model_based_controller_dict(self.scene["robot"],
+                                                            r_dict, 
+                                                            self.action_manager._action,
+                                                            physics_dt = self.physics_dt)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
             #print(f"[DEBUG] FT controller time: {time.perf_counter() - st:.6f} sec")

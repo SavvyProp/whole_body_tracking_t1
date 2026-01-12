@@ -1,5 +1,5 @@
 import torch
-from isaaclab.utils.math import quat_apply
+from isaaclab.utils.math import quat_apply, quat_to_rot_matrix
 from torch._dynamo import disable
 
 bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
@@ -13,13 +13,17 @@ TORQUE_LIMITS = torch.tensor([
 
 MASS = 31.614357
 SPHERE_RAD = 0.30
-SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
+#SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
+#ANGULAR_INERTIA = torch.tensor(
+#    [[SPHERE_MOI, 0.0, 0.0],
+#     [0.0, SPHERE_MOI, 0.0],
+#     [0.0, 0.0, SPHERE_MOI]],
+#    dtype=torch.float32,
+#)
 ANGULAR_INERTIA = torch.tensor(
-    [[SPHERE_MOI, 0.0, 0.0],
-     [0.0, SPHERE_MOI, 0.0],
-     [0.0, 0.0, SPHERE_MOI]],
-    dtype=torch.float32,
-)
+    [[ 2.77498525e+00,  5.36123413e-04,  2.12637797e-01],
+ [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03],
+ [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]])
 
 EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
 EEF_NUM = len(EEF_BODIES)
@@ -46,7 +50,7 @@ def ctrl2logits(act):
     return logits
 
 @torch.compile
-def ctrl2components(act, joint_vel):
+def ctrl2components(act):
     logits = ctrl2logits(act)
     des_pos = logits["des_pos"]
     des_angvel = logits["des_com_angvel"] * 0.20
@@ -80,7 +84,7 @@ def ctrl2components(act, joint_vel):
     }
 
 @torch.compile
-def make_centroidal_ag(eefpos, com_pos):
+def make_centroidal_ag(eefpos, com_pos, base_quat):
     """
     Vectorized version of make_centroidal_ag without Python loops.
 
@@ -107,7 +111,11 @@ def make_centroidal_ag(eefpos, com_pos):
     S[..., 2, 1] =  rx
 
     # invI: compute on the active device/dtype (proper matrix inverse; inertia is diagonal).
-    invI_single = torch.linalg.inv(ANGULAR_INERTIA.to(device=device, dtype=dtype))
+    rot_mat = quat_to_rot_matrix(base_quat)  # (N, 3, 3)
+    i_b = ANGULAR_INERTIA.to(device=device, dtype=dtype)
+    i_w = rot_mat @ i_b.expand(N, 3, 3) @ rot_mat.transpose(-1, -2)
+
+    invI_single = torch.linalg.inv(i_w)
     invI = invI_single.expand(N, -1, -1).unsqueeze(1)
 
     # Bottom block per effector: [invI @ S, invI] -> (N, E, 3, 6)
@@ -306,7 +314,7 @@ def schur_solve(
 
 
 def ft_ref(
-    eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight
+    eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight, base_quat
 ):
     # Concat the unaccounted force component
     ctrl_num = tau_ref.shape[-1]
@@ -321,7 +329,7 @@ def ft_ref(
 
     # Ensure weights tensor matches eefpos device/dtype.
     weights = torch.tensor([1e-3, 1e1], device=eefpos.device, dtype=eefpos.dtype)
-    a, g = make_centroidal_ag(eefpos, com_pos)
+    a, g = make_centroidal_ag(eefpos, com_pos, base_quat)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
     qp_q_ = qp_q_ * weights[0]
@@ -369,9 +377,9 @@ def highlvlPD(base_quat, base_angvel,
 def step(com_pos, com_vel,
          jacs,
          eefpos,
-         base_quat, base_angvel, joint_vel,
+         base_quat, base_angvel,
          action):
-    comp_dict = ctrl2components(action, joint_vel)
+    comp_dict = ctrl2components(action)
     com_acc, ang_acc, global_vel, global_angvel = highlvlPD(
         base_quat, base_angvel,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
@@ -389,6 +397,7 @@ def step(com_pos, com_vel,
         torch.cat([com_acc, ang_acc], dim=-1),
         comp_dict["w"],
         comp_dict["torque_weight"],
+        base_quat
     )
     info["com_vel"] = global_vel
     info["com_angvel"] = global_angvel
