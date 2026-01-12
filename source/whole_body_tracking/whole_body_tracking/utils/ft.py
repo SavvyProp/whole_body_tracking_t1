@@ -1,5 +1,5 @@
 import torch
-from isaaclab.utils.math import quat_apply, quat_to_rot_matrix
+from isaaclab.utils.math import quat_apply, matrix_from_quat
 from torch._dynamo import disable
 
 bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
@@ -111,7 +111,7 @@ def make_centroidal_ag(eefpos, com_pos, base_quat):
     S[..., 2, 1] =  rx
 
     # invI: compute on the active device/dtype (proper matrix inverse; inertia is diagonal).
-    rot_mat = quat_to_rot_matrix(base_quat)  # (N, 3, 3)
+    rot_mat = matrix_from_quat(base_quat)  # (N, 3, 3)
     i_b = ANGULAR_INERTIA.to(device=device, dtype=dtype)
     i_w = rot_mat @ i_b.expand(N, 3, 3) @ rot_mat.transpose(-1, -2)
 

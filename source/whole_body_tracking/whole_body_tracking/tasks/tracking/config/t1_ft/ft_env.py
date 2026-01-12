@@ -23,7 +23,7 @@ def robot_dict(robot):
         "base_quat": robot.data.root_link_quat_w,
         "com_pos": robot.data.root_com_pos_w,
         "body_pos_w": robot.data.body_pos_w,
-        "body_vel_w": robot.data.body_vel_w,
+        "body_vel_w": robot.data.body_vel_w[..., :3],
     }
 
 def model_based_controller(robot, action):
