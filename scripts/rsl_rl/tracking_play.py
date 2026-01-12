@@ -20,6 +20,7 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--motion_file", type=str, default=None, help="Path to the motion file.")
+parser.add_argument("--checkpoint_no", type=int, default=None, help="Checkpoint number to load.")
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -95,6 +96,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             file = args_cli.wandb_path.split("/")[-1]
         else:
             file = max(files, key=lambda x: int(x.split("_")[1].split(".")[0]))
+        if args_cli.checkpoint_no is not None:
+            file = f"model_{args_cli.checkpoint_no}.pt"
 
         wandb_file = wandb_run.file(str(file))
         wandb_file.download("./logs/rsl_rl/temp", replace=True)
