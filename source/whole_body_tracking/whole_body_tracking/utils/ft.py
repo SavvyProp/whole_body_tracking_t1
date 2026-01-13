@@ -2,17 +2,39 @@ import torch
 from isaaclab.utils.math import quat_apply, matrix_from_quat
 from torch._dynamo import disable
 
-bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
-joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 'Head_pitch', 'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 'Left_Hip_Pitch', 'Right_Hip_Pitch', 'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 'Left_Hip_Roll', 'Right_Hip_Roll', 'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 'Left_Hip_Yaw', 'Right_Hip_Yaw', 'Left_Knee_Pitch', 'Right_Knee_Pitch', 'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 'Left_Ankle_Roll', 'Right_Ankle_Roll']
+bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'AL4', 'AR4', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'AL5', 'AR5', 'Shank_Left', 'Shank_Right', 'AL6', 'AR6', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_hand_link', 'right_hand_link', 'left_foot_link', 'right_foot_link']
+joints = ['AAHead_yaw', 
+          'Left_Shoulder_Pitch', 
+          'Right_Shoulder_Pitch', 
+          'Waist', 
+          'Head_pitch', 
+          'Left_Shoulder_Roll',
+          'Right_Shoulder_Roll', 
+          'Left_Hip_Pitch', 
+          'Right_Hip_Pitch', 
+          'Left_Elbow_Pitch', 
+          'Right_Elbow_Pitch', 
+          'Left_Hip_Roll', 
+          'Right_Hip_Roll', 
+          'Left_Elbow_Yaw', 
+          'Right_Elbow_Yaw', 
+          'Left_Hip_Yaw', 
+          'Right_Hip_Yaw', 
+          'Left_Wrist_Pitch', 'Right_Wrist_Pitch', 
+          'Left_Knee_Pitch', 'Right_Knee_Pitch', 
+          'Left_Wrist_Yaw', 'Right_Wrist_Yaw', 
+          'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 
+          'Left_Hand_Roll', 'Right_Hand_Roll', 
+          'Left_Ankle_Roll', 'Right_Ankle_Roll']
 
-CTRL_NUM = 23
+CTRL_NUM = 29
 
 TORQUE_LIMITS = torch.tensor([
-    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 60, 60, 24, 24, 15, 15
+    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 18, 18, 60, 60, 18, 18, 24, 24, 18, 18, 15, 15
 ], dtype=torch.float32)
 
 MASS = 31.614357
-SPHERE_RAD = 0.30
+#SPHERE_RAD = 0.30
 #SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
 #ANGULAR_INERTIA = torch.tensor(
 #    [[SPHERE_MOI, 0.0, 0.0],
@@ -45,7 +67,6 @@ def ctrl2logits(act):
         "des_com_angvel": des_com_angvel,
         "w": w,
         "torque": torque,
-        "torque_weight_logit": None
     }
     return logits
 

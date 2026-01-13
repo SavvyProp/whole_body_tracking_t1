@@ -44,7 +44,7 @@ def model_based_controller_dict(robot, r_dict, action, physics_dt = 0.005):
     com_pos = r_dict["com_pos"]
     body_pos_w = r_dict["body_pos_w"]
     base_quat = r_dict["base_quat"]
-    pos, ff_torque, info = ft.jit_step(com_pos, com_vel, r_dict["jacs"],
+    pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,
                              base_angvel, action)
     # Update values in r_dict
@@ -74,7 +74,7 @@ class FTActionManager(ActionManager):
     @property
     def total_action_dim(self) -> int:
         """Total action dimension."""
-        return 53 + ft.EEF_NUM
+        return ft.CTRL_NUM * 2 + 7 + ft.EEF_NUM
     
     def process_action(self, action: torch.Tensor):
         if self.total_action_dim != action.shape[1]:

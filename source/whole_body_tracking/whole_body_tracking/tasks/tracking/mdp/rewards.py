@@ -144,11 +144,9 @@ def ft_tau_ref(env: ManagerBasedRLEnv) -> torch.Tensor:
     exp_err = torch.exp(-frc_err / (sigma ** 2))
     return exp_err
 
-TORQUE_LIMITS = torch.tensor(
-    [7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 60, 60, 24, 24, 15, 15],
-    dtype=torch.float32,
-)
-
+TORQUE_LIMITS = torch.tensor([
+    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 18, 18, 60, 60, 18, 18, 24, 24, 18, 18, 15, 15
+], dtype=torch.float32)
 
 def ft_tau_limit(env: ManagerBasedRLEnv) -> torch.Tensor:
     ff_torque = env.ft_rew_info["ff_tau"]

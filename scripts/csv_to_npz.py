@@ -274,6 +274,8 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene, joi
 
         # set joint state
         joint_pos = robot.data.default_joint_pos.clone()
+        print(robot.data.joint_names)
+        print(robot.data.body_names)
         print(robot_joint_indexes)
         joint_vel = robot.data.default_joint_vel.clone()
         joint_pos[:, robot_joint_indexes] = motion_dof_pos
@@ -335,31 +337,35 @@ def main():
     run_simulator(
         sim,
         scene,
-        joint_names=[
-                "AAHead_yaw",
-                "Head_pitch",
-                "Left_Shoulder_Pitch",
-                "Left_Shoulder_Roll",
-                "Left_Elbow_Pitch",
-                "Left_Elbow_Yaw",
-                "Right_Shoulder_Pitch",
-                "Right_Shoulder_Roll",
-                "Right_Elbow_Pitch",
-                "Right_Elbow_Yaw",
-                "Waist",
-                "Left_Hip_Pitch",
-                "Left_Hip_Roll",
-                "Left_Hip_Yaw",
-                "Left_Knee_Pitch",
-                "Left_Ankle_Pitch",
-                "Left_Ankle_Roll",
-                "Right_Hip_Pitch",
-                "Right_Hip_Roll",
-                "Right_Hip_Yaw",
-                "Right_Knee_Pitch",
-                "Right_Ankle_Pitch",
-                "Right_Ankle_Roll",
-            ],
+        joint_names = [
+    "Left_Shoulder_Pitch",  # Motor ID 0
+    "Left_Shoulder_Roll",   # Motor ID 1
+    "Left_Elbow_Pitch",     # Motor ID 2
+    "Left_Elbow_Yaw",       # Motor ID 3
+    "Left_Wrist_Pitch",     # Motor ID 4
+    "Left_Wrist_Yaw",       # Motor ID 5
+    "Left_Hand_Roll",       # Motor ID 6
+    "Right_Shoulder_Pitch", # Motor ID 7
+    "Right_Shoulder_Roll",  # Motor ID 8
+    "Right_Elbow_Pitch",    # Motor ID 9
+    "Right_Elbow_Yaw",      # Motor ID 10
+    "Right_Wrist_Pitch",    # Motor ID 11
+    "Right_Wrist_Yaw",      # Motor ID 12
+    "Right_Hand_Roll",      # Motor ID 13
+    "Waist",                # Motor ID 14
+    "Left_Hip_Pitch",       # Motor ID 15
+    "Left_Hip_Roll",        # Motor ID 16
+    "Left_Hip_Yaw",         # Motor ID 17
+    "Left_Knee_Pitch",      # Motor ID 18
+    "Left_Ankle_Pitch",     # Motor ID 19
+    "Left_Ankle_Roll",      # Motor ID 20
+    "Right_Hip_Pitch",      # Motor ID 21
+    "Right_Hip_Roll",       # Motor ID 22
+    "Right_Hip_Yaw",        # Motor ID 23
+    "Right_Knee_Pitch",     # Motor ID 24
+    "Right_Ankle_Pitch",    # Motor ID 25
+    "Right_Ankle_Roll",     # Motor ID 26
+]
     )
 
 
