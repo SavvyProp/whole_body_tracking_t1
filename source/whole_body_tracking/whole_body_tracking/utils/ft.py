@@ -27,12 +27,13 @@ joints = ['AAHead_yaw',
           'Left_Hand_Roll', 'Right_Hand_Roll', 
           'Left_Ankle_Roll', 'Right_Ankle_Roll']
 
-CTRL_NUM = 29
+
 
 TORQUE_LIMITS = torch.tensor([
     7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 18, 18, 60, 60, 18, 18, 24, 24, 18, 18, 15, 15
 ], dtype=torch.float32)
 
+CTRL_NUM = 29
 MASS = 31.614357
 #SPHERE_RAD = 0.30
 #SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD

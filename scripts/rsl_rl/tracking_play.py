@@ -181,8 +181,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     ref_vel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     ref_angvel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
 
-    sim_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 23))
-    sim_joint_torque = np.zeros((duration, env_cfg.scene.num_envs, 23))
+    sim_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 29))
+    sim_joint_torque = np.zeros((duration, env_cfg.scene.num_envs, 29))
 
     for c in range(duration):
         # run everything in inference mode
@@ -196,6 +196,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             robot = env.unwrapped.scene["robot"]
             command = env.unwrapped.command_manager.get_term("motion")
             print(command.time_steps)
+            print(robot.data.default_joint_pos)
             
             body_ids = _get_body_indexes(command, body_names)
             sim_pos[c, :, :, :] = command.robot_body_pos_w[:, body_ids, :].cpu().numpy()
