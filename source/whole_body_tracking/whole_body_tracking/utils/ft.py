@@ -91,7 +91,7 @@ def ctrl2components(act):
     torque_weight = torch.square(1.0 / torque_limits)
 
     d_gain_lin = 8.0
-    d_gain_angvel = 1.5
+    d_gain_angvel = 40.0
 
     return {
         "des_pos": des_pos,

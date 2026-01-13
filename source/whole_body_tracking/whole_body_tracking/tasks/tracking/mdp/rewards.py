@@ -168,6 +168,6 @@ def com_acc_magnitude(env: ManagerBasedRLEnv) -> torch.Tensor:
 def com_angacc_magnitude(env: ManagerBasedRLEnv) -> torch.Tensor:
     com_angacc = env.ft_rew_info["com_angacc"]
     angacc_mag = torch.linalg.norm(com_angacc, dim=-1)
-    angacc_limit = 3.0
+    angacc_limit = 50.0
     over_limit = torch.relu(angacc_mag - angacc_limit)
     return over_limit
