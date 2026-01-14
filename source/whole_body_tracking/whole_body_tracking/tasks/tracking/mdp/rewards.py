@@ -155,19 +155,19 @@ def ft_tau_limit(env: ManagerBasedRLEnv) -> torch.Tensor:
 
     torque_limits = TORQUE_LIMITS.to(device=ff_torque.device, dtype=ff_torque.dtype)
     over_limit = torch.relu(torch.abs(ff_torque) - soft_limit * torque_limits[None, :])
-    frc_err = torch.sum(torch.square(over_limit), dim=-1)
+    frc_err = torch.sum(over_limit, dim=-1)
     return frc_err
 
 def com_acc_magnitude(env: ManagerBasedRLEnv) -> torch.Tensor:
     com_acc = env.ft_rew_info["com_acc"]
     acc_mag = torch.linalg.norm(com_acc, dim=-1)
-    acc_limit = 1.5
+    acc_limit = 2.0
     over_limit = torch.relu(acc_mag - acc_limit)
     return over_limit
 
 def com_angacc_magnitude(env: ManagerBasedRLEnv) -> torch.Tensor:
     com_angacc = env.ft_rew_info["com_angacc"]
     angacc_mag = torch.linalg.norm(com_angacc, dim=-1)
-    angacc_limit = 50.0
+    angacc_limit = 40.0
     over_limit = torch.relu(angacc_mag - angacc_limit)
     return over_limit

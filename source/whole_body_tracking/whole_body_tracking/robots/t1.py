@@ -230,11 +230,11 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
                 "Waist": STIFFNESS_MID * FT_FAC,
             },
             damping = {
-                ".*_Hip_Pitch": DAMPING_HIGH * FT_FAC * 2.0,
-                ".*_Hip_Roll": DAMPING_MID * FT_FAC * 2.0,
-                ".*_Hip_Yaw": DAMPING_MID * FT_FAC * 2.0,
-                ".*_Knee_Pitch": DAMPING_HIGH * FT_FAC * 2.0,
-                "Waist": DAMPING_MID * FT_FAC,
+                ".*_Hip_Pitch": DAMPING_HIGH,# * FT_FAC * 2.0,
+                ".*_Hip_Roll": DAMPING_MID,# * FT_FAC * 2.0,
+                ".*_Hip_Yaw": DAMPING_MID,# * FT_FAC * 2.0,
+                ".*_Knee_Pitch": DAMPING_HIGH,# * FT_FAC * 2.0,
+                "Waist": DAMPING_MID,# * FT_FAC,
             }
         ),
         "feet": ImplicitActuatorCfg(
@@ -242,7 +242,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
             stiffness=STIFFNESS_LOW * FT_FAC,
-            damping=DAMPING_LOW * FT_FAC * 2.0,
+            damping=DAMPING_LOW,# * FT_FAC * 2.0,
             armature=ARMATURE_LOW,
         ),
         "arms": ImplicitActuatorCfg(
@@ -258,7 +258,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             effort_limit_sim=18.0,
             velocity_limit_sim=18.8,
             stiffness=STIFFNESS_LOW * FT_FAC,
-            damping=DAMPING_LOW * FT_FAC * 2.0,
+            damping=DAMPING_LOW, #* FT_FAC * 2.0,
             armature=ARMATURE_LOW,
         ),
         "head": ImplicitActuatorCfg(
@@ -266,7 +266,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             effort_limit_sim=10.0,
             velocity_limit_sim=10.0,
             stiffness=STIFFNESS_LOW * FT_FAC,
-            damping=DAMPING_LOW * FT_FAC * 2.0,
+            damping=DAMPING_LOW, # * FT_FAC * 2.0,
             armature=ARMATURE_LOW,
         )
     },

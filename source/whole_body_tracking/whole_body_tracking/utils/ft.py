@@ -45,8 +45,8 @@ MASS = 31.614357
 #)
 ANGULAR_INERTIA = torch.tensor(
     [[ 2.77498525e+00,  5.36123413e-04,  2.12637797e-01],
- [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03],
- [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]])
+    [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03],
+    [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]])
 
 EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
 EEF_NUM = len(EEF_BODIES)
@@ -91,7 +91,7 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits)
 
-    d_gain_lin = 8.0
+    d_gain_lin = 10.0
     d_gain_angvel = 40.0
 
     return {
