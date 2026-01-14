@@ -18,25 +18,17 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils.math import quat_from_angle_axis, quat_mul
 
 def robot_dict(robot):
+    cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_compensation_forces()[:, 6:]
+    grav_nle = robot.root_physx_view.get_gravity_compensation_forces()[:, 6:]
+    nle = cor_nle + grav_nle
     return {
         "jacs": robot.root_physx_view.get_jacobians(),
         "base_quat": robot.data.root_link_quat_w,
         "com_pos": robot.data.root_com_pos_w,
         "body_pos_w": robot.data.body_pos_w,
         "body_vel_w": robot.data.body_vel_w[..., :3],
+        "nle": nle,
     }
-
-def model_based_controller(robot, action):
-    body_pos_w = robot.data.body_pos_w
-    jacs = robot.root_physx_view.get_jacobians()    
-    base_quat = robot.data.root_link_quat_w  # (N, 3)
-    base_angvel = robot.data.root_com_ang_vel_w
-    com_pos = robot.data.root_com_pos_w  # (N, 3)
-    com_vel = robot.data.root_lin_vel_w  # (N, 3)
-    pos, ff_torque, info = ft.jit_step(com_pos, com_vel, jacs, body_pos_w, 
-                             base_quat, base_angvel, action)
-    
-    return pos, ff_torque, info
 
 def model_based_controller_dict(robot, r_dict, action, physics_dt = 0.005):
     com_vel = robot.data.root_lin_vel_w  # (N, 3)
@@ -47,6 +39,7 @@ def model_based_controller_dict(robot, r_dict, action, physics_dt = 0.005):
     pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,
                              base_angvel, action)
+    ff_torque += r_dict["nle"]
     # Update values in r_dict
     r_dict["com_pos"] = com_pos + com_vel * physics_dt
     r_dict["body_pos_w"] = body_pos_w + r_dict["body_vel_w"] * physics_dt
