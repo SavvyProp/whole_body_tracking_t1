@@ -147,7 +147,7 @@ BOOSTER_T1_CFG = ArticulationCfg(
     },
 )
 
-FT_FAC = 1.0
+FT_FAC = 0.5
 
 BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
