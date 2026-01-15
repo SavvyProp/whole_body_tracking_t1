@@ -332,7 +332,7 @@ class RewardsCfg:
 
     acc_mag = RewTerm(
         func=mdp.com_acc_magnitude,
-        weight=-1.0,
+        weight=-0.1,
         params = {}
     )
 
