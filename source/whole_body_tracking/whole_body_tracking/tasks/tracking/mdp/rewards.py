@@ -161,7 +161,7 @@ def ft_tau_limit(env: ManagerBasedRLEnv) -> torch.Tensor:
 def com_acc_magnitude(env: ManagerBasedRLEnv) -> torch.Tensor:
     com_acc = env.ft_rew_info["com_acc"]
     acc_mag = torch.linalg.norm(com_acc, dim=-1)
-    acc_limit = 1.5
+    acc_limit = 1.0
     over_limit = torch.relu(acc_mag - acc_limit)
     return over_limit
 

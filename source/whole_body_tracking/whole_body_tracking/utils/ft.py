@@ -384,7 +384,7 @@ def ft_ref(
 def highlvlPD(base_quat, base_angvel, 
               lin_gain, angvel_gain,
               des_vel, des_angvel,
-              com_vel, w):
+              com_vel):
     q_wb = base_quat
     global_des_vel = quat_apply(q_wb, des_vel)
     global_des_angvel = quat_apply(q_wb, des_angvel)
@@ -393,10 +393,10 @@ def highlvlPD(base_quat, base_angvel,
 
     # com_acc should be clipped to a max of 2
 
-    acc_mag = torch.linalg.norm(com_acc, dim=-1, keepdim=True)
-    max_acc = 2.0
-    new_acc_mag = torch.clamp(acc_mag, max=max_acc)
-    com_acc = com_acc * (new_acc_mag / (acc_mag + 1e-6))
+    #acc_mag = torch.linalg.norm(com_acc, dim=-1, keepdim=True)
+    #max_acc = 2.0
+    #new_acc_mag = torch.clamp(acc_mag, max=max_acc)
+    #com_acc = com_acc * (new_acc_mag / (acc_mag + 1e-6))
 
     com_angvel = base_angvel
     ang_acc = angvel_gain * (global_des_angvel - com_angvel)
@@ -413,7 +413,7 @@ def step(com_pos, com_vel,
         base_quat, base_angvel,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
         comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
-        com_vel, comp_dict["w"]
+        com_vel
     )
 
     idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
