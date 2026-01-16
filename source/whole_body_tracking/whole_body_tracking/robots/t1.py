@@ -203,8 +203,8 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             ],
             effort_limit_sim={
                 ".*_Hip_Pitch": 45.0,
-                ".*_Hip_Roll": 30.0,
-                ".*_Hip_Yaw": 30.0,
+                ".*_Hip_Roll": 25.0,
+                ".*_Hip_Yaw": 25.0,
                 ".*_Knee_Pitch": 60.0,
                 "Waist": 30.0,
             },
