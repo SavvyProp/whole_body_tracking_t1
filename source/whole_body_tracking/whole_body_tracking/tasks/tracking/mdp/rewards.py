@@ -131,7 +131,7 @@ def ft_force_correctness(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> 
     pred_force = pred_force.reshape(pred_force.shape[0], num_eef, 6)
     pred_lin_force = pred_force[:, :, :3]
     force_err = torch.sum(torch.square(net_forces_w - pred_lin_force), dim=-1)  # (N, EEF_NUM)
-    sigma = 150.0
+    sigma = 100.0
     exp_err = torch.exp(-torch.sum(force_err, dim = -1) / (sigma ** 2))
     return exp_err
 
@@ -171,3 +171,19 @@ def com_angacc_magnitude(env: ManagerBasedRLEnv) -> torch.Tensor:
     angacc_limit = 40.0
     over_limit = torch.relu(angacc_mag - angacc_limit)
     return over_limit
+
+def com_linacc_corectness(env: ManagerBasedRLEnv) -> torch.Tensor:
+    lin_acc = env.ft_rew_info["lin_acc"]
+    des_com_acc = env.ft_rew_info["com_acc"]
+    lse = torch.sum(torch.square(lin_acc - des_com_acc), dim=-1)
+    sigma = 2.0
+    exp_err = torch.exp(-lse / (sigma ** 2))
+    return exp_err
+
+def com_angacc_corectness(env: ManagerBasedRLEnv) -> torch.Tensor:
+    ang_acc = env.ft_rew_info["ang_acc"]
+    des_com_angacc = env.ft_rew_info["com_angacc"]
+    lse = torch.sum(torch.square(ang_acc - des_com_angacc), dim=-1)
+    sigma = 8.0
+    exp_err = torch.exp(-lse / (sigma ** 2))
+    return exp_err

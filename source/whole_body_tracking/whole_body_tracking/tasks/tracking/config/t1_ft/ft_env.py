@@ -39,6 +39,8 @@ def model_based_controller_dict(robot, r_dict, action, physics_dt = 0.005):
     pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,
                              base_angvel, action)
+    info["com_vel"] = com_vel
+    info["com_angvel"] = base_angvel
     ff_torque += r_dict["nle"]
     # Update values in r_dict
     r_dict["com_pos"] = com_pos + com_vel * physics_dt
@@ -49,7 +51,7 @@ def model_based_controller_dict(robot, r_dict, action, physics_dt = 0.005):
     r_dict["base_quat"] = quat_mul(small_quat, base_quat)
     return pos, ff_torque, info
 
-def make_ft_rew_dict(robot, contact_mask, info):
+def make_ft_rew_dict(robot, contact_mask, info, linacc, angacc):
     ft_rew_dict = {
         "applied_torque": robot.data.applied_torque,
         "contact_mask": contact_mask,
@@ -60,6 +62,8 @@ def make_ft_rew_dict(robot, contact_mask, info):
         "des_com_angvel": info["com_angvel"],
         "com_acc": info["com_acc"],
         "com_angacc": info["com_angacc"],
+        "lin_acc": linacc,
+        "ang_acc": angacc,
     }
     return ft_rew_dict
 
@@ -165,6 +169,10 @@ class FTEnv(ManagerBasedRLEnv):
         is_rendering = self.sim.has_gui() or self.sim.has_rtx_sensors()
         # perform physics stepping
         r_dict = robot_dict(self.scene["robot"])
+        prev_vel = self.scene["robot"].data.root_lin_vel_w.clone()
+        prev_angvel = self.scene["robot"].data.root_com_ang_vel_w.clone()
+        lin_acc = torch.zeros_like(prev_vel, device=prev_vel.device)
+        ang_acc = torch.zeros_like(prev_angvel, device=prev_angvel.device)
         for i in range(self.cfg.decimation):
             self._sim_step_counter += 1
             # set actions into buffers
@@ -179,6 +187,13 @@ class FTEnv(ManagerBasedRLEnv):
                                                             physics_dt = self.physics_dt)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
+
+            # Calculate acceleration
+            lin_acc = (info["com_vel"] - prev_vel) / self.physics_dt
+            ang_acc = (info["com_angvel"] - prev_angvel) / self.physics_dt
+            prev_vel = info["com_vel"]
+            prev_angvel = info["com_angvel"]
+
             #print(f"[DEBUG] FT controller time: {time.perf_counter() - st:.6f} sec")
             # set actions into simulator
             #st = time.perf_counter()
@@ -203,8 +218,7 @@ class FTEnv(ManagerBasedRLEnv):
             contact_mask = (torch.linalg.norm(net_forces_w, dim=-1) > 10.0)  # (N, |body_ids|)
             self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], 
                                                 contact_mask,
-                                                info)
-
+                                                info, lin_acc, ang_acc)
         # post-step:
         # -- update env counters (used for curriculum generation)
         self.episode_length_buf += 1  # step in current episode (per env)
