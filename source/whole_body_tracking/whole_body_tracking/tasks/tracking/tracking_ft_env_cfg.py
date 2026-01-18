@@ -344,7 +344,7 @@ class RewardsCfg:
 
     acc_correctness = RewTerm(
         func=mdp.com_linacc_corectness,
-        weight=0.1,
+        weight=0.5,
         params = {}
     )
 
