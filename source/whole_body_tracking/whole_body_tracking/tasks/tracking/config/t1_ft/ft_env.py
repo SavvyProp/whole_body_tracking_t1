@@ -187,7 +187,6 @@ class FTEnv(ManagerBasedRLEnv):
                                                             physics_dt = self.physics_dt)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()
-            st = time.perf_counter()
 
             # Calculate acceleration
             lin_acc = (info["com_vel"] - prev_vel) / self.physics_dt
@@ -209,7 +208,6 @@ class FTEnv(ManagerBasedRLEnv):
                 self.sim.render()
             # update buffers at sim dt
             self.scene.update(dt=self.physics_dt)
-            print("Physics step time:", time.perf_counter() - st)
 
             #print(f"[DEBUG] Physics step time: {time.perf_counter() - st:.6f} sec")
 
