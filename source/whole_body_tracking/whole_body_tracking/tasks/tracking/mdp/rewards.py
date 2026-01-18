@@ -176,7 +176,7 @@ def com_linacc_corectness(env: ManagerBasedRLEnv) -> torch.Tensor:
     lin_acc = env.ft_rew_info["lin_acc"]
     des_com_acc = env.ft_rew_info["com_acc"]
     lse = torch.sum(torch.square(lin_acc - des_com_acc), dim=-1)
-    sigma = 2.0
+    sigma = 4.0
     exp_err = torch.exp(-lse / (sigma ** 2))
     return exp_err
 
