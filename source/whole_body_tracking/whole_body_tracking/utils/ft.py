@@ -34,7 +34,7 @@ TORQUE_LIMITS = torch.tensor([
 ], dtype=torch.float32)
 
 CTRL_NUM = 29
-MASS = 31.614357
+MASS = 34.634069
 #SPHERE_RAD = 0.30
 #SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
 #ANGULAR_INERTIA = torch.tensor(
@@ -44,9 +44,9 @@ MASS = 31.614357
 #    dtype=torch.float32,
 #)
 ANGULAR_INERTIA = torch.tensor(
-    [[ 2.77498525e+00,  5.36123413e-04,  2.12637797e-01],
-    [ 5.36123413e-04,  2.64427940e+00, -2.98730940e-03],
-    [ 2.12637797e-01, -2.98730940e-03,  4.91490757e-01]])
+    [[ 2.76900149e+00,  4.50170509e-04,  3.66299529e-02],
+ [ 4.50170509e-04,  2.30203655e+00, -4.42839862e-04],
+ [ 3.66299529e-02, -4.42839862e-04,  5.62235551e-01]])
 
 EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
 EEF_NUM = len(EEF_BODIES)
