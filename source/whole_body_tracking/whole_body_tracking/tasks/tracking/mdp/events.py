@@ -91,3 +91,51 @@ def randomize_rigid_body_com(
 
     # Set the new coms
     asset.root_physx_view.set_coms(coms, env_ids)
+
+def randomize_lcc(
+        env,
+        env_ids: torch.Tensor | None,
+        lcc_range: dict[str, tuple[float, float]],
+):
+    """
+    Make a dictionary of randomized lcc_rand_dict that defines a set of offsets and
+    scalar multiples to randomize aspects of the com dict.
+    vel_range: tuple[float, float],
+    angvel_range: tuple[float, float],
+    mass_fac_range: tuple[float, float],
+    i_fac_range: tuple[float, float],
+    jac_fac_range: tuple[float, float],
+    pos_range: tuple[float, float],
+    "com_vel": torch.zeros((self.num_envs, 3), device=self.device),
+    "com_angvel": torch.zeros((self.num_envs, 3), device=self.device),
+    "mass_fac": torch.ones((self.num_envs,), device = self.device),
+    "i_fac": torch.ones((self.num_envs, 3, 3), device = self.device),
+    "jac_fac": torch.ones((self.num_envs, 24, 29 + 6), device = self.device),
+    "pos": torch.zeros((self.num_envs, 5, 3))
+    """
+    if env_ids is None:
+        env_ids = torch.arange(env.scene.num_envs, device="cpu")
+    else:
+        env_ids = env_ids.cpu()
+    vel_range = lcc_range.get("vel", (0.0, 0.0))
+    angvel_range = lcc_range.get("angvel", (0.0, 0.0))
+    mass_fac_range = lcc_range.get("mass_fac", (1.0, 1.0))
+    i_fac_range = lcc_range.get("i_fac", (1.0, 1.0))
+    jac_fac_range = lcc_range.get("jac_fac", (1.0, 1.0))
+    pos_range = lcc_range.get("pos", (0.0, 0.0))
+
+    vel_offsets = math_utils.sample_uniform(vel_range[0], vel_range[1], (len(env_ids), 3), device=env.device)
+    angvel_offsets = math_utils.sample_uniform(angvel_range[0], angvel_range[1], (len(env_ids), 3), device=env.device)
+    mass_facs = math_utils.sample_uniform(mass_fac_range[0], mass_fac_range[1], (len(env_ids),), device=env.device)
+    i_facs = math_utils.sample_uniform(i_fac_range[0], i_fac_range[1], (len(env_ids),3, 3), device=env.device)
+    jac_facs = math_utils.sample_uniform(jac_fac_range[0], jac_fac_range[1], (len(env_ids), 24, 29 + 6), device=env.device)
+    pos_offsets = math_utils.sample_uniform(pos_range[0], pos_range[1], (len(env_ids), 5, 3), device=env.device)
+    
+    lcc_rand_dict = env.lcc_bias
+    lcc_rand_dict["com_vel"][env_ids] = vel_offsets
+    lcc_rand_dict["com_angvel"][env_ids] = angvel_offsets
+    lcc_rand_dict["mass_fac"][env_ids] = mass_facs
+    lcc_rand_dict["i_fac"][env_ids] = i_facs
+    lcc_rand_dict["jac_fac"][env_ids] = jac_facs
+    lcc_rand_dict["pos"][env_ids] = pos_offsets
+    env.lcc_bias = lcc_rand_dict

@@ -1,3 +1,3 @@
-python scripts/csv_to_npz.py --input_file data/CMU_40_05.npz --input_fps 30 --output_name CMU_40_05 --headless
+python scripts/csv_to_npz.py --input_file data/HDM_WRS.npz --input_fps 30 --output_name HDM_WRS --headless
 
-python scripts/replay_npz.py --registry_name=ludwigtaycheeying-purdue-university-org/wandb-registry-motions/CMU_40_05
+python scripts/replay_npz.py --registry_name=ludwigtaycheeying-purdue-university-org/wandb-registry-motions/HDM_WRS

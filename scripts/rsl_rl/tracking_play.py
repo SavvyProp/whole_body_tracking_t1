@@ -174,6 +174,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     duration = env.unwrapped.command_manager.get_term("motion").motion.time_step_total - 1
     duration = min(duration, 10 * 50)
 
+    sim_action = None
     sim_pos = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     sim_vel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     sim_angvel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
@@ -191,6 +192,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             actions = policy(obs)
             if actions.ndim == 1:
                 actions = torch.reshape(actions, (1, -1))
+            if sim_action is None:
+                sim_action = np.zeros((duration, env_cfg.scene.num_envs, actions.shape[1]))
             # env stepping
             obs, _, _, _ = env.step(actions)
             robot = env.unwrapped.scene["robot"]
@@ -199,6 +202,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             print(robot.data.default_joint_pos)
             
             body_ids = _get_body_indexes(command, body_names)
+            sim_action[c, :, :] = actions.cpu().numpy()
             sim_pos[c, :, :, :] = command.robot_body_pos_w[:, body_ids, :].cpu().numpy()
             sim_vel[c, :, :, :] = command.robot_body_lin_vel_w[:, body_ids, :].cpu().numpy()
             sim_angvel[c, :, :, :] = command.robot_body_ang_vel_w[:, body_ids, :].cpu().numpy()
@@ -215,6 +219,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 break
     eval_name = "eval_data/tracking_play_data.npz"
     np.savez(eval_name, **{
+                            "sim_action": sim_action,
                            "sim_pos": sim_pos,
                             "sim_vel": sim_vel,
                             "sim_angvel": sim_angvel,

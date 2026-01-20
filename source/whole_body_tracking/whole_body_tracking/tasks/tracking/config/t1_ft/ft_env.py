@@ -30,7 +30,7 @@ def robot_dict(robot):
         "nle": nle,
     }
 
-def model_based_controller_dict(robot, r_dict, action, physics_dt = 0.005):
+def model_based_controller_dict(robot, r_dict, action, lcc_rand, physics_dt = 0.005):
     com_vel = robot.data.root_lin_vel_w  # (N, 3)
     base_angvel = robot.data.root_com_ang_vel_w
     com_pos = r_dict["com_pos"]
@@ -38,7 +38,7 @@ def model_based_controller_dict(robot, r_dict, action, physics_dt = 0.005):
     base_quat = r_dict["base_quat"]
     pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,
-                             base_angvel, action)
+                             base_angvel, action, lcc_rand)
     info["com_vel"] = com_vel
     info["com_angvel"] = base_angvel
     ff_torque += r_dict["nle"]
@@ -99,7 +99,14 @@ class FTEnv(ManagerBasedRLEnv):
                 "contact_forces",
                 body_names=EEF_BODIES
             )
-        
+        self.lcc_bias = {
+            "com_vel": torch.zeros((self.num_envs, 3), device=self.device),
+            "com_angvel": torch.zeros((self.num_envs, 3), device=self.device),
+            "mass_fac": torch.ones((self.num_envs,), device = self.device),
+            "i_fac": torch.ones((self.num_envs, 3, 3), device = self.device),
+            "jac_fac": torch.ones((self.num_envs, 24, 29 + 6), device = self.device),
+            "pos": torch.zeros((self.num_envs, 5, 3), device = self.device)
+        }
         self.sensor_cfg.resolve(self.scene)
 
     def load_managers(self):
@@ -184,6 +191,7 @@ class FTEnv(ManagerBasedRLEnv):
             pos, torque, info = model_based_controller_dict(self.scene["robot"],
                                                             r_dict, 
                                                             self.action_manager._action,
+                                                            self.lcc_bias,
                                                             physics_dt = self.physics_dt)
             self.action_manager.update_torques(pos, torque)
             self.action_manager.apply_action()

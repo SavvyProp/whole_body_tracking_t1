@@ -198,6 +198,31 @@ class EventCfg:
         interval_range_s=(1.0, 3.0),
         params={"velocity_range": VELOCITY_RANGE},
     )
+    """
+    vel_range = lcc_range.get("vel", (0.0, 0.0))
+    angvel_range = lcc_range.get("angvel", (0.0, 0.0))
+    mass_fac_range = lcc_range.get("mass_fac", (1.0, 1.0))
+    i_fac_range = lcc_range.get("i_fac", (1.0, 1.0))
+    jac_fac_range = lcc_range.get("jac_fac", (1.0, 1.0))
+    pos_range = lcc_range.get("pos", (0.0, 0.0))
+    """
+    # randomize lcc bias
+    randomize_lcc = EventTerm(
+        func = mdp.randomize_lcc,
+        mode="interval",
+        interval_range_s=(0.02, 0.10),
+        params={
+            "lcc_range":
+            {
+                "vel_range": (-0.05, 0.05),
+                "angvel_range": (-0.1, 0.1),
+                "mass_fac_range": (0.9, 1.1),
+                "i_fac_range": (0.9, 1.1),
+                "jac_fac_range": (0.9, 1.1),
+                "pos_range": (-0.02, 0.02),
+            }
+        },
+    )
 
 @configclass
 class EventEvalCfg:

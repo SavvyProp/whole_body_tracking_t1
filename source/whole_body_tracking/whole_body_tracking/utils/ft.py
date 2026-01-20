@@ -45,8 +45,8 @@ MASS = 34.634069
 #)
 ANGULAR_INERTIA = torch.tensor(
     [[ 2.76900149e+00,  4.50170509e-04,  3.66299529e-02],
- [ 4.50170509e-04,  2.30203655e+00, -4.42839862e-04],
- [ 3.66299529e-02, -4.42839862e-04,  5.62235551e-01]])
+    [ 4.50170509e-04,  2.30203655e+00, -4.42839862e-04],
+    [ 3.66299529e-02, -4.42839862e-04,  5.62235551e-01]])
 
 EEF_BODIES = ["left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"]
 EEF_NUM = len(EEF_BODIES)
@@ -106,7 +106,7 @@ def ctrl2components(act):
     }
 
 @torch.compile
-def make_centroidal_ag(eefpos, com_pos, base_quat):
+def make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b):
     """
     Vectorized version of make_centroidal_ag without Python loops.
 
@@ -134,21 +134,21 @@ def make_centroidal_ag(eefpos, com_pos, base_quat):
 
     # invI: compute on the active device/dtype (proper matrix inverse; inertia is diagonal).
     rot_mat = matrix_from_quat(base_quat)  # (N, 3, 3)
-    i_b = ANGULAR_INERTIA.to(device=device, dtype=dtype)
-    i_w = rot_mat @ i_b.expand(N, 3, 3) @ rot_mat.transpose(-1, -2)
-
-    invI_single = torch.linalg.inv(i_w)
-    invI = invI_single.expand(N, -1, -1).unsqueeze(1)
+    #i_b = ANGULAR_INERTIA.to(device=device, dtype=dtype)
+    i_w = rot_mat @ i_b @ rot_mat.transpose(-1, -2)
+    invI = torch.linalg.inv(i_w)
+    #invI_single = torch.linalg.inv(i_w)
+    #invI = invI_single.expand(N, -1, -1).unsqueeze(1)
 
     # Bottom block per effector: [invI @ S, invI] -> (N, E, 3, 6)
-    bot_left = invI @ S                         # (N, E, 3, 3)
-    bot_right = invI.expand(N, E, 3, 3)         # (N, E, 3, 3)
+    bot_left = invI.view(N, 1, 3, 3).expand(N, E, 3, 3) @ S                         # (N, E, 3, 3)
+    bot_right = invI.view(N, 1, 3, 3).expand(N, E, 3, 3)         # (N, E, 3, 3)
     f_bot = torch.cat([bot_left, bot_right], dim=-1)  # (N, E, 3, 6)
 
     # Top block per effector: [I/M, 0] -> (N, E, 3, 6)
-    I3 = torch.eye(3, device=device, dtype=dtype)
-    f_top_base = torch.cat([I3 / MASS, torch.zeros_like(I3)], dim=-1)  # (3, 6)
-    f_top = f_top_base.view(1, 1, 3, 6).expand(N, E, 3, 6)
+    I3 = torch.eye(3, device=device, dtype=dtype).view(1, 3, 3).expand(N, 3, 3)
+    f_top_base = torch.cat([I3 / mass[:, None, None], torch.zeros_like(I3)], dim=-1)  # (3, 6)
+    f_top = f_top_base.view(N, 1, 3, 6).expand(N, E, 3, 6)
 
     # Full per-effector 6x6 block: (N, E, 6, 6)
     f_block = torch.cat([f_top, f_bot], dim=-2)  # (N, E, 6, 6)
@@ -336,7 +336,7 @@ def schur_solve(
 
 
 def ft_ref(
-    eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight, base_quat
+    eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight, base_quat, mass, i_b
 ):
     # Concat the unaccounted force component
     ctrl_num = tau_ref.shape[-1]
@@ -351,7 +351,7 @@ def ft_ref(
 
     # Ensure weights tensor matches eefpos device/dtype.
     weights = torch.tensor([1e-3, 1e1], device=eefpos.device, dtype=eefpos.dtype)
-    a, g = make_centroidal_ag(eefpos, com_pos, base_quat)
+    a, g = make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
     qp_q_ = qp_q_ * weights[0]
@@ -407,26 +407,41 @@ def step(com_pos, com_vel,
          jacs,
          eefpos,
          base_quat, base_angvel,
-         action):
+         action, lcc_rand):
     comp_dict = ctrl2components(action)
+    com_vel_ = com_vel + lcc_rand["com_vel"]
+    base_angvel_ = base_angvel + lcc_rand["com_angvel"]
     com_acc, ang_acc, global_vel, global_angvel = highlvlPD(
-        base_quat, base_angvel,
+        base_quat, base_angvel_,
         comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
         comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
-        com_vel
+        com_vel_
     )
 
     idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
     selected_jacs = jacs.index_select(1, idx)                 # (N, EEF_NUM, 6, D)
     jacs_ = selected_jacs.reshape(selected_jacs.size(0), -1, selected_jacs.size(-1))  # (N, 6*EEF_NUM, D)
     eefpos_ = eefpos.index_select(1, idx)                 # (N, EEF_NUM, 3)
+
+    # Add offsets to pos
+    eefpos_offset = lcc_rand["pos"][:, 1:, :]
+    eefpos_0 = eefpos_ + eefpos_offset
+    com_pos_ = com_pos + lcc_rand["pos"][:, 0, :]
+
+    # Modify jacs
+    jacs_0 = jacs_ * lcc_rand["jac_fac"]
+
+    # Modify mass
+    mass = MASS * lcc_rand["mass_fac"]
+    i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
+
     tau, info = ft_ref(
-        eefpos_, com_pos, jacs_,
+        eefpos_0, com_pos_, jacs_0,
         comp_dict["torque"],
         torch.cat([com_acc, ang_acc], dim=-1),
         comp_dict["w"],
         comp_dict["torque_weight"],
-        base_quat
+        base_quat, mass, i_b
     )
     info["com_vel"] = global_vel
     info["com_angvel"] = global_angvel
