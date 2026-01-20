@@ -18,9 +18,9 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils.math import quat_from_angle_axis, quat_mul
 
 def robot_dict(robot):
-    cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_compensation_forces()[:, 6:]
+    #cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_compensation_forces()[:, 6:]
     grav_nle = robot.root_physx_view.get_gravity_compensation_forces()[:, 6:]
-    nle = cor_nle + grav_nle
+    nle = grav_nle #cor_nle + grav_nle
     return {
         "jacs": robot.root_physx_view.get_jacobians(),
         "base_quat": robot.data.root_link_quat_w,
