@@ -155,8 +155,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # reset environment
     obs, _ = env.get_observations()
     motion_cmd = env.unwrapped.command_manager.get_term("motion")
-    motion_cmd.time_steps = torch.zeros_like(motion_cmd.time_steps, 
-                                             device = motion_cmd.time_steps.device)
+    #motion_cmd.time_steps = torch.zeros_like(motion_cmd.time_steps, 
+    #                                         device = motion_cmd.time_steps.device)
     #obs, _ = env.get_observations()
     timestep = 0
     # simulate environment
@@ -173,10 +173,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         #jnt_pos = obs["policy"][0, 61:84]
         jnt_pos = robot.data.joint_pos[0, :]
         action_ = actions[0, :]
-        print("Joint Positions:")
-        print(jnt_pos)
-        print("Actions:")
-        print(action_)
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video

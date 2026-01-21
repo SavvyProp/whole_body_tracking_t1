@@ -117,12 +117,12 @@ def randomize_lcc(
         env_ids = torch.arange(env.scene.num_envs, device="cpu")
     else:
         env_ids = env_ids.cpu()
-    vel_range = lcc_range.get("vel", (0.0, 0.0))
-    angvel_range = lcc_range.get("angvel", (0.0, 0.0))
-    mass_fac_range = lcc_range.get("mass_fac", (1.0, 1.0))
-    i_fac_range = lcc_range.get("i_fac", (1.0, 1.0))
-    jac_fac_range = lcc_range.get("jac_fac", (1.0, 1.0))
-    pos_range = lcc_range.get("pos", (0.0, 0.0))
+    vel_range = lcc_range.get("vel_range", (0.0, 0.0))
+    angvel_range = lcc_range.get("angvel_range", (0.0, 0.0))
+    mass_fac_range = lcc_range.get("mass_fac_range", (1.0, 1.0))
+    i_fac_range = lcc_range.get("i_fac_range", (1.0, 1.0))
+    jac_fac_range = lcc_range.get("jac_fac_range", (1.0, 1.0))
+    pos_range = lcc_range.get("pos_range", (0.0, 0.0))
 
     vel_offsets = math_utils.sample_uniform(vel_range[0], vel_range[1], (len(env_ids), 3), device=env.device)
     angvel_offsets = math_utils.sample_uniform(angvel_range[0], angvel_range[1], (len(env_ids), 3), device=env.device)
