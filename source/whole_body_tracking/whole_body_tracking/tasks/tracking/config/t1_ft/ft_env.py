@@ -180,7 +180,7 @@ class FTEnv(ManagerBasedRLEnv):
         prev_angvel = self.scene["robot"].data.root_com_ang_vel_w.clone()
         lin_acc = torch.zeros_like(prev_vel, device=prev_vel.device)
         ang_acc = torch.zeros_like(prev_angvel, device=prev_angvel.device)
-        #print(self.lcc_bias)
+        print(self.lcc_bias)
         for i in range(self.cfg.decimation):
             self._sim_step_counter += 1
             # set actions into buffers
