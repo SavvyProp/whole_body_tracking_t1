@@ -63,7 +63,7 @@ import whole_body_tracking.tasks  # noqa: F401
 from whole_body_tracking.utils.exporter import attach_onnx_metadata, export_motion_policy_as_onnx
 
 body_names = [
-    "Trunk", "AL3", "AR3", "left_foot_link", "right_foot_link"
+    "Trunk", "left_hand_link", "right_hand_link", "left_foot_link", "right_foot_link"
 ]
 
 def _get_body_indexes(command, body_names: list[str] | None) -> list[int]:
@@ -150,13 +150,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # obtain the trained policy for inference
     policy = ppo_runner.get_inference_policy(device=env.unwrapped.device)
-
     # export policy to onnx/jit
     export_model_dir = os.path.join(os.path.dirname(resume_path), "exported")
-
     export_motion_policy_as_onnx(
         env.unwrapped,
         ppo_runner.alg.policy,
+        normalizer=ppo_runner.alg.policy.actor_obs_normalizer,
         path=export_model_dir,
         filename="policy.onnx",
     )
@@ -175,15 +174,21 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     duration = min(duration, 10 * 50)
 
     sim_action = None
+    sim_obs = None
     sim_pos = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     sim_vel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     sim_angvel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     ref_pos = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     ref_vel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     ref_angvel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
+    sim_ori = np.zeros((duration, env_cfg.scene.num_envs, 4))
 
     sim_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 29))
+    sim_joint_vel = np.zeros((duration, env_cfg.scene.num_envs, 29))
     sim_joint_torque = np.zeros((duration, env_cfg.scene.num_envs, 29))
+    sim_ff_torque = np.zeros((duration, env_cfg.scene.num_envs, 29))
+    sim_joint_torque_nle = np.zeros((duration, env_cfg.scene.num_envs, 29))
+    sim_des_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 29))
 
     for c in range(duration):
         # run everything in inference mode
@@ -194,15 +199,22 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 actions = torch.reshape(actions, (1, -1))
             if sim_action is None:
                 sim_action = np.zeros((duration, env_cfg.scene.num_envs, actions.shape[1]))
+            
             # env stepping
-            obs, _, _, _ = env.step(actions)
+            
+            pol_obs = obs["policy"]
+            if sim_obs is None:
+                sim_obs = np.zeros((duration, env_cfg.scene.num_envs, pol_obs.shape[-1]))
+            sim_obs[c, :, :] = pol_obs.cpu().numpy()
+
             robot = env.unwrapped.scene["robot"]
             command = env.unwrapped.command_manager.get_term("motion")
-            print(command.time_steps)
-            print(robot.data.default_joint_pos)
-            
+            action_ = env.unwrapped.action_manager.get_term("joint_pos")
+            obs, _, _, _ = env.step(actions)
             body_ids = _get_body_indexes(command, body_names)
+            
             sim_action[c, :, :] = actions.cpu().numpy()
+            sim_des_joint_pos[c, :, :] = action_.processed_actions.cpu().numpy()
             sim_pos[c, :, :, :] = command.robot_body_pos_w[:, body_ids, :].cpu().numpy()
             sim_vel[c, :, :, :] = command.robot_body_lin_vel_w[:, body_ids, :].cpu().numpy()
             sim_angvel[c, :, :, :] = command.robot_body_ang_vel_w[:, body_ids, :].cpu().numpy()
@@ -211,6 +223,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             ref_angvel[c, :, :, :] = command.body_ang_vel_w[:, body_ids, :].cpu().numpy()
             sim_joint_pos[c, :, :] = robot.data.joint_pos.cpu().numpy()
             sim_joint_torque[c, :, :] = robot.data.applied_torque.cpu().numpy()
+            sim_ori[c, :, :] = robot.data.root_link_quat_w.cpu().numpy()
+            sim_joint_vel[c, :, :] = robot.data.joint_vel.cpu().numpy()
+            try:
+                #print(env.unwrapped.ft_rew_info["ff_tau"])
+                sim_ff_torque[c, :, :] = env.unwrapped.ft_rew_info["ff_tau"].cpu().numpy()
+                sim_joint_torque_nle[c, :, :] = env.unwrapped.ft_rew_info["nle"].cpu().numpy()
+            except:
+                pass
         #jnt_pos = obs["policy"][0, 61:84]
         if args_cli.video:
             timestep += 1
@@ -227,7 +247,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                             "ref_vel": ref_vel,
                             "ref_angvel": ref_angvel,
                             "joint_pos": sim_joint_pos,
+                            "joint_vel": sim_joint_vel,
                             "joint_torque": sim_joint_torque,
+                            "sim_obs": sim_obs,
+                            "sim_ori": sim_ori,
+                            "sim_ff_torque": sim_ff_torque,
+                            "sim_nle_torque": sim_joint_torque_nle,
+                            "sim_des_joint_pos": sim_des_joint_pos
                            })
 
     # close the simulator

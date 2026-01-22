@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import isaaclab.sim as sim_utils
-from isaaclab.actuators import ImplicitActuatorCfg
+from isaaclab.actuators import ImplicitActuatorCfg, IdealPDActuatorCfg
 from isaaclab.assets.articulation import ArticulationCfg
 
 from whole_body_tracking.assets import ASSET_DIR
@@ -193,7 +193,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
     ),
     soft_joint_pos_limit_factor=0.9,
     actuators={
-        "legs": ImplicitActuatorCfg(
+        "legs": IdealPDActuatorCfg(
             joint_names_expr=[
                 ".*_Hip_Pitch",
                 ".*_Hip_Roll",
@@ -290,13 +290,17 @@ T1_LG_ACTION_SCALE = {}
 for a in BOOSTER_T1_LOWGAIN_CFG.actuators.values():
     e = a.effort_limit_sim
     s = a.stiffness
+    d = a.damping
     names = a.joint_names_expr
     if not isinstance(e, dict):
         e = {n: e for n in names}
     if not isinstance(s, dict):
         s = {n: s for n in names}
+    if not isinstance(d, dict):
+        d = {n: d for n in names}
     for n in names:
         if n in e and n in s and s[n]:
+            print(n, e[n], s[n], d[n])
             T1_LG_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
 
 print("T1_ACTION_SCALE:", T1_ACTION_SCALE)

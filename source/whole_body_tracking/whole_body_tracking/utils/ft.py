@@ -3,22 +3,7 @@ from isaaclab.utils.math import quat_apply, matrix_from_quat
 from torch._dynamo import disable
 
 bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'AL4', 'AR4', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'AL5', 'AR5', 'Shank_Left', 'Shank_Right', 'AL6', 'AR6', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_hand_link', 'right_hand_link', 'left_foot_link', 'right_foot_link']
-joints = ['AAHead_yaw', 
-          'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 
-          'Waist', 
-          'Head_pitch', 
-          'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 
-          'Left_Hip_Pitch', 'Right_Hip_Pitch', 
-          'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 
-          'Left_Hip_Roll', 'Right_Hip_Roll', 
-          'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 
-          'Left_Hip_Yaw', 'Right_Hip_Yaw', 
-          'Left_Wrist_Pitch', 'Right_Wrist_Pitch', 
-          'Left_Knee_Pitch', 'Right_Knee_Pitch', 
-          'Left_Wrist_Yaw', 'Right_Wrist_Yaw', 
-          'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 
-          'Left_Hand_Roll', 'Right_Hand_Roll', 
-          'Left_Ankle_Roll', 'Right_Ankle_Roll']
+joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 'Head_pitch', 'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 'Left_Hip_Pitch', 'Right_Hip_Pitch', 'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 'Left_Hip_Roll', 'Right_Hip_Roll', 'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 'Left_Hip_Yaw', 'Right_Hip_Yaw', 'Left_Wrist_Pitch', 'Right_Wrist_Pitch', 'Left_Knee_Pitch', 'Right_Knee_Pitch', 'Left_Wrist_Yaw', 'Right_Wrist_Yaw', 'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 'Left_Hand_Roll', 'Right_Hand_Roll', 'Left_Ankle_Roll', 'Right_Ankle_Roll']
 
 
 
@@ -344,7 +329,7 @@ def schur_solve(
 
 
 def ft_ref(
-    eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight, base_quat, mass, i_b
+    eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight, base_quat, mass, i_b, nle
 ):
     # Concat the unaccounted force component
     ctrl_num = tau_ref.shape[-1]
@@ -376,6 +361,7 @@ def ft_ref(
 
     candidate_tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
+    candidate_tau = candidate_tau + nle
 
     # Clamp using torque limits on the same device/dtype as candidate_tau.
     torque_limits = TORQUE_LIMITS.to(device=candidate_tau.device, dtype=candidate_tau.dtype)
@@ -415,7 +401,7 @@ def step(com_pos, com_vel,
          jacs,
          eefpos,
          base_quat, base_angvel,
-         action, lcc_rand):
+         action, nle, lcc_rand):
     comp_dict = ctrl2components(action)
     com_vel_ = com_vel + lcc_rand["com_vel"]
     base_angvel_ = base_angvel + lcc_rand["com_angvel"]
@@ -449,7 +435,7 @@ def step(com_pos, com_vel,
         torch.cat([com_acc, ang_acc], dim=-1),
         comp_dict["w"],
         comp_dict["torque_weight"],
-        base_quat, mass, i_b
+        base_quat, mass, i_b, nle
     )
     info["com_vel"] = global_vel
     info["com_angvel"] = global_angvel

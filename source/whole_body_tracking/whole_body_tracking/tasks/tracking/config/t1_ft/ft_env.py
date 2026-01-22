@@ -38,10 +38,9 @@ def model_based_controller_dict(robot, r_dict, action, lcc_rand, physics_dt = 0.
     base_quat = r_dict["base_quat"]
     pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,
-                             base_angvel, action, lcc_rand)
+                             base_angvel, action, r_dict["nle"], lcc_rand)
     info["com_vel"] = com_vel
     info["com_angvel"] = base_angvel
-    ff_torque += r_dict["nle"]
     # Update values in r_dict
     r_dict["com_pos"] = com_pos + com_vel * physics_dt
     r_dict["body_pos_w"] = body_pos_w + r_dict["body_vel_w"] * physics_dt
@@ -51,7 +50,7 @@ def model_based_controller_dict(robot, r_dict, action, lcc_rand, physics_dt = 0.
     r_dict["base_quat"] = quat_mul(small_quat, base_quat)
     return pos, ff_torque, info
 
-def make_ft_rew_dict(robot, contact_mask, info, linacc, angacc):
+def make_ft_rew_dict(robot, contact_mask, info, linacc, angacc, r_dict):
     ft_rew_dict = {
         "applied_torque": robot.data.applied_torque,
         "contact_mask": contact_mask,
@@ -64,6 +63,7 @@ def make_ft_rew_dict(robot, contact_mask, info, linacc, angacc):
         "com_angacc": info["com_angacc"],
         "lin_acc": linacc,
         "ang_acc": angacc,
+        "nle": r_dict["nle"],
     }
     return ft_rew_dict
 
@@ -108,6 +108,7 @@ class FTEnv(ManagerBasedRLEnv):
             "pos": torch.zeros((self.num_envs, 5, 3), device = self.device)
         }
         self.sensor_cfg.resolve(self.scene)
+        
 
     def load_managers(self):
         # note: this order is important since observation manager needs to know the command and action managers
@@ -226,7 +227,7 @@ class FTEnv(ManagerBasedRLEnv):
             contact_mask = (torch.linalg.norm(net_forces_w, dim=-1) > 10.0)  # (N, |body_ids|)
             self.ft_rew_info = make_ft_rew_dict(self.scene["robot"], 
                                                 contact_mask,
-                                                info, lin_acc, ang_acc)
+                                                info, lin_acc, ang_acc, r_dict)
         # post-step:
         # -- update env counters (used for curriculum generation)
         self.episode_length_buf += 1  # step in current episode (per env)
