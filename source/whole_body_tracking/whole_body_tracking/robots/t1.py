@@ -237,7 +237,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
                 "Waist": DAMPING_MID,# * FT_FAC,
             }
         ),
-        "feet": ImplicitActuatorCfg(
+        "feet": IdealPDActuatorCfg(
             joint_names_expr=[".*_Ankle_Pitch", ".*_Ankle_Roll"],
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
@@ -245,7 +245,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             damping=DAMPING_LOW,# * FT_FAC * 2.0,
             armature=ARMATURE_LOW,
         ),
-        "arms": ImplicitActuatorCfg(
+        "arms": IdealPDActuatorCfg(
             joint_names_expr=[
                 ".*_Shoulder_Pitch",
                 ".*_Shoulder_Roll",
@@ -261,7 +261,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             damping=DAMPING_LOW, #* FT_FAC * 2.0,
             armature=ARMATURE_LOW,
         ),
-        "head": ImplicitActuatorCfg(
+        "head": IdealPDActuatorCfg(
             joint_names_expr=["AAHead_yaw", "Head_pitch"],
             effort_limit_sim=10.0,
             velocity_limit_sim=10.0,
