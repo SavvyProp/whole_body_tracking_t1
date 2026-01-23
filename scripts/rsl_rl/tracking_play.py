@@ -240,7 +240,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     eval_name = "eval_data/tracking_play_data.npz"
     np.savez(eval_name, **{
                             "sim_action": sim_action,
-                           "sim_pos": sim_pos,
+                            "sim_pos": sim_pos,
                             "sim_vel": sim_vel,
                             "sim_angvel": sim_angvel,
                             "ref_pos": ref_pos,

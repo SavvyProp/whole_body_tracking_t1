@@ -1,1 +1,1 @@
-python scripts/rsl_rl/tracking_play.py --task=Tracking-Flat-T1-Eval-v0 --num_envs=2 --wandb_path=ludwigtaycheeying-purdue-university/t1_pd_29/o7034595 # --checkpoint_no 5000
+python scripts/rsl_rl/tracking_play.py --task=Tracking-Flat-T1-Eval-v0 --num_envs=2 --wandb_path=ludwigtaycheeying-purdue-university/t1_pd_29/l7c43qr0 # --checkpoint_no 5000

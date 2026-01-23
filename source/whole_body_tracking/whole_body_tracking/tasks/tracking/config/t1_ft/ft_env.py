@@ -90,6 +90,53 @@ class FTActionManager(ActionManager):
             term.process_actions(term_actions)
             idx += term.action_dim
 
+def get_pd_gains_in_dof_order(robot, device=None):
+    """Return (kp, kd) shaped (num_envs, num_dof) in the same order as robot.data.joint_pos.
+
+    Assumes gains are defined via robot.cfg.actuators with per-joint values and joint name lists.
+    """
+    device = device or robot.device
+    num_envs = robot.num_envs
+    num_dof = robot.num_dof
+
+    # Map DOF/joint name -> dof index in robot.data.joint_pos order
+    # Isaac Lab typically exposes these names in the Articulation data.
+    dof_names = list(robot.data.joint_names)  # length == num_dof
+    name_to_idx = {n: i for i, n in enumerate(dof_names)}
+
+    kp = torch.zeros((num_envs, num_dof), device=device)
+    kd = torch.zeros((num_envs, num_dof), device=device)
+
+    # Iterate actuators and stamp gains into the correct DOF slots
+    # Depending on your robot config structure, the attribute names can be:
+    # - actuator.joint_names
+    # - actuator.stiffness / actuator.damping (scalar, list, or tensor)
+    for _, actuator in robot.cfg.actuators.items():
+        joint_names = list(actuator.joint_names)
+
+        # Convert stiffness/damping to per-joint tensors
+        # (supports scalar or list-like)
+        kps = torch.as_tensor(actuator.stiffness, device=device).flatten()
+        kds = torch.as_tensor(actuator.damping, device=device).flatten()
+
+        if kps.numel() == 1:
+            kps = kps.repeat(len(joint_names))
+        if kds.numel() == 1:
+            kds = kds.repeat(len(joint_names))
+
+        if kps.numel() != len(joint_names) or kds.numel() != len(joint_names):
+            raise ValueError(
+                f"Actuator gains size mismatch: {len(joint_names)=}, {kps.numel()=}, {kds.numel()=}"
+            )
+
+        for j, jname in enumerate(joint_names):
+            if jname not in name_to_idx:
+                continue
+            dof_i = name_to_idx[jname]
+            kp[:, dof_i] = kps[j]
+            kd[:, dof_i] = kds[j]
+
+    return kp, kd
 
 class FTEnv(ManagerBasedRLEnv):
     def __init__(self, cfg: TrackingEnvCfg, render_mode: str | None = None, **kwargs):
@@ -108,6 +155,7 @@ class FTEnv(ManagerBasedRLEnv):
             "pos": torch.zeros((self.num_envs, 5, 3), device = self.device)
         }
         self.sensor_cfg.resolve(self.scene)
+        self.kp, self.kd = get_pd_gains_in_dof_order(self.scene["robot"], device=self.device)
         
 
     def load_managers(self):
