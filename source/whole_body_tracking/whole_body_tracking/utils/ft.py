@@ -84,7 +84,7 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits)
 
-    d_gain_lin = 10.0
+    d_gain_lin = 15.0
     d_gain_angvel = 10.0
 
     return {

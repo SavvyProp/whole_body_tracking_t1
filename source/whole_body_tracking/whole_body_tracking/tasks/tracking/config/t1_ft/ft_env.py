@@ -8,14 +8,16 @@ from isaaclab.managers import CommandManager, CurriculumManager, RewardManager, 
 from isaaclab.ui.widgets import ManagerLiveVisualizer
 import time
 from whole_body_tracking.utils.ft import EEF_BODIES
+from isaaclab.managers import SceneEntityCfg
+from isaaclab.utils.math import quat_from_angle_axis, quat_mul
+import re
+
 # Implementation of FT environment. Idea is to implement the pure FT
 # function and save a ft_info dict as part of the env class
 # No observation change, contact rewards, centroid velocity rewards
 
 # Implementation note: build a custom ActionManager with overriden action size
 # ActionManager should have the big action size
-from isaaclab.managers import SceneEntityCfg
-from isaaclab.utils.math import quat_from_angle_axis, quat_mul
 
 def robot_dict(robot):
     #cor_nle = robot.root_physx_view.get_coriolis_and_centrifugal_compensation_forces()[:, 6:]
@@ -80,61 +82,109 @@ class FTActionManager(ActionManager):
         self._prev_action[:] = self._action
         self._action[:] = action.to(self.device)
 
-    def update_torques(self, pos, torque):
-        idx = 0
+    def update_torques(self, pos, torque, kp):
+        #idx = 0
         for term_name, term in self._terms.items():
+            pos_offset = torque / kp
+            new_pos = pos + pos_offset
             if term_name == "joint_pos":
-                term_actions = pos
-            else:  # torque
-                term_actions = torque
+                term_actions = new_pos
+            #else:  # torque
+            #    term_actions = torque
             term.process_actions(term_actions)
-            idx += term.action_dim
+            #idx += term.action_dim
 
-def get_pd_gains_in_dof_order(robot, device=None):
-    """Return (kp, kd) shaped (num_envs, num_dof) in the same order as robot.data.joint_pos.
+def get_pd_gains_in_dof_order(robot, num_envs, device=None):
+    """Return (kp, kd) shaped (num_envs, num_dof) aligned with robot.data.joint_pos.
 
-    Assumes gains are defined via robot.cfg.actuators with per-joint values and joint name lists.
+    This supports Isaac Lab actuator configs such as ImplicitActuatorCfg where joints are
+    selected via regex expressions (typically `joint_names_expr`) and gains may be scalars
+    or dicts keyed by the same regex expressions.
     """
     device = device or robot.device
-    num_envs = robot.num_envs
-    num_dof = robot.num_dof
 
-    # Map DOF/joint name -> dof index in robot.data.joint_pos order
-    # Isaac Lab typically exposes these names in the Articulation data.
-    dof_names = list(robot.data.joint_names)  # length == num_dof
-    name_to_idx = {n: i for i, n in enumerate(dof_names)}
+    dof_names = list(robot.data.joint_names)
+    num_dof = len(dof_names)
 
     kp = torch.zeros((num_envs, num_dof), device=device)
     kd = torch.zeros((num_envs, num_dof), device=device)
 
-    # Iterate actuators and stamp gains into the correct DOF slots
-    # Depending on your robot config structure, the attribute names can be:
-    # - actuator.joint_names
-    # - actuator.stiffness / actuator.damping (scalar, list, or tensor)
+    def _matches(expr: str, name: str) -> bool:
+        # Treat actuator expressions as regex. Use fullmatch when possible, otherwise match.
+        try:
+            return (re.fullmatch(expr, name) is not None) or (re.match(expr, name) is not None)
+        except re.error:
+            # If expr isn't a valid regex, fall back to exact match.
+            return expr == name
+
+    def _value_for_expr(val, expr: str):
+        # val can be scalar-like or dict keyed by expr.
+        if isinstance(val, dict):
+            # Prefer exact key match; otherwise allow regex key to match the expr.
+            if expr in val:
+                return val[expr]
+            for k, v in val.items():
+                try:
+                    if re.fullmatch(k, expr) or re.match(k, expr):
+                        return v
+                except re.error:
+                    continue
+            # Not found -> treat as 0.0
+            return 0.0
+        return val
+
     for _, actuator in robot.cfg.actuators.items():
-        joint_names = list(actuator.joint_names)
+        # ImplicitActuatorCfg typically exposes joint_names_expr
+        if hasattr(actuator, "joint_names_expr"):
+            exprs = list(actuator.joint_names_expr)
+            for expr in exprs:
+                kp_val = _value_for_expr(getattr(actuator, "stiffness", 0.0), expr)
+                kd_val = _value_for_expr(getattr(actuator, "damping", 0.0), expr)
 
-        # Convert stiffness/damping to per-joint tensors
-        # (supports scalar or list-like)
-        kps = torch.as_tensor(actuator.stiffness, device=device).flatten()
-        kds = torch.as_tensor(actuator.damping, device=device).flatten()
+                # Convert to python floats if tensors are provided
+                if torch.is_tensor(kp_val):
+                    kp_val = kp_val.item()
+                if torch.is_tensor(kd_val):
+                    kd_val = kd_val.item()
 
-        if kps.numel() == 1:
-            kps = kps.repeat(len(joint_names))
-        if kds.numel() == 1:
-            kds = kds.repeat(len(joint_names))
+                idxs = [i for i, n in enumerate(dof_names) if _matches(expr, n)]
+                if len(idxs) == 0:
+                    continue
 
-        if kps.numel() != len(joint_names) or kds.numel() != len(joint_names):
-            raise ValueError(
-                f"Actuator gains size mismatch: {len(joint_names)=}, {kps.numel()=}, {kds.numel()=}"
-            )
+                kp[:, idxs] = float(kp_val)
+                kd[:, idxs] = float(kd_val)
 
-        for j, jname in enumerate(joint_names):
-            if jname not in name_to_idx:
-                continue
-            dof_i = name_to_idx[jname]
-            kp[:, dof_i] = kps[j]
-            kd[:, dof_i] = kds[j]
+            continue
+
+        # Fallback path for explicit joint lists (if present in other actuator types)
+        if hasattr(actuator, "joint_names"):
+            joint_names = list(actuator.joint_names)
+            kps = torch.as_tensor(getattr(actuator, "stiffness", 0.0), device=device).flatten()
+            kds = torch.as_tensor(getattr(actuator, "damping", 0.0), device=device).flatten()
+
+            if kps.numel() == 1:
+                kps = kps.repeat(len(joint_names))
+            if kds.numel() == 1:
+                kds = kds.repeat(len(joint_names))
+
+            if kps.numel() != len(joint_names) or kds.numel() != len(joint_names):
+                raise ValueError(
+                    f"Actuator gains size mismatch: {len(joint_names)=}, {kps.numel()=}, {kds.numel()=}"
+                )
+
+            name_to_idx = {n: i for i, n in enumerate(dof_names)}
+            for j, jname in enumerate(joint_names):
+                if jname not in name_to_idx:
+                    continue
+                dof_i = name_to_idx[jname]
+                kp[:, dof_i] = kps[j]
+                kd[:, dof_i] = kds[j]
+            continue
+
+        raise AttributeError(
+            f"Unsupported actuator cfg type: {type(actuator).__name__}. "
+            "Expected joint_names_expr or joint_names."
+        )
 
     return kp, kd
 
@@ -155,7 +205,9 @@ class FTEnv(ManagerBasedRLEnv):
             "pos": torch.zeros((self.num_envs, 5, 3), device = self.device)
         }
         self.sensor_cfg.resolve(self.scene)
-        self.kp, self.kd = get_pd_gains_in_dof_order(self.scene["robot"], device=self.device)
+        self.kp, self.kd = get_pd_gains_in_dof_order(self.scene["robot"], 
+                                                     self.num_envs,
+                                                     device=self.device)
         
 
     def load_managers(self):
@@ -242,7 +294,7 @@ class FTEnv(ManagerBasedRLEnv):
                                                             self.action_manager._action,
                                                             self.lcc_bias,
                                                             physics_dt = self.physics_dt)
-            self.action_manager.update_torques(pos, torque)
+            self.action_manager.update_torques(pos, torque, self.kp)
             self.action_manager.apply_action()
 
             # Calculate acceleration

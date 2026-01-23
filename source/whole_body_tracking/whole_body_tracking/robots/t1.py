@@ -242,7 +242,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
             stiffness=STIFFNESS_LOW * FT_FAC,
-            damping=DAMPING_LOW,# * FT_FAC * 2.0,
+            damping=4.0,# * FT_FAC * 2.0,
             armature=ARMATURE_LOW,
         ),
         "arms": ImplicitActuatorCfg(
