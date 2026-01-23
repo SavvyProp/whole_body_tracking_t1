@@ -82,10 +82,13 @@ class FTActionManager(ActionManager):
         self._prev_action[:] = self._action
         self._action[:] = action.to(self.device)
 
-    def update_torques(self, pos, torque, kp):
+    def update_torques(self, pos, torque, kp, action_scale):
         #idx = 0
+        # Pos target is pos * action_scale + offset
+        # pos * action_scale + offset + t/k
+        # (pos + t/(k * action_scale)) + offset
         for term_name, term in self._terms.items():
-            pos_offset = torque / kp
+            pos_offset = torque / (kp * action_scale)
             new_pos = pos + pos_offset
             if term_name == "joint_pos":
                 term_actions = new_pos
@@ -188,6 +191,61 @@ def get_pd_gains_in_dof_order(robot, num_envs, device=None):
 
     return kp, kd
 
+def make_dof_ordered_jointpos_and_action_scale(robot, num_envs: int, default_joint_pos_cfg: dict, action_scale_cfg: dict, device=None):
+    """Create DOF-ordered (default_joint_pos, action_scale) aligned with robot.data.joint_names.
+
+    Args:
+        robot: Isaac Lab Articulation instance.
+        num_envs: Number of environments (used to broadcast default_joint_pos).
+        default_joint_pos_cfg: Dict mapping joint-name or regex -> default joint position (float).
+                              Typically robot.cfg.init_state.joint_pos.
+        action_scale_cfg: Dict mapping joint-name or regex -> action scale (float).
+                          For T1 this is typically T1_ACTION_SCALE/T1_LG_ACTION_SCALE built from joint expr.
+        device: Torch device.
+
+    Returns:
+        default_joint_pos: (num_envs, num_dof) tensor.
+        action_scale: (num_dof,) tensor.
+    """
+    device = device or robot.device
+
+    dof_names = list(robot.data.joint_names)
+    num_dof = len(dof_names)
+
+    default_joint_pos = torch.zeros((num_envs, num_dof), device=device)
+    action_scale = torch.ones((num_dof,), device=device)
+    def _matches(expr: str, name: str) -> bool:
+        # Interpret keys as regex (common in Isaac Lab configs); fall back to exact.
+        try:
+            return (re.fullmatch(expr, name) is not None) or (re.match(expr, name) is not None)
+        except re.error:
+            return expr == name
+
+    def _apply_scalar_map(dst: torch.Tensor, mapping: dict, *, per_env: bool):
+        # Apply in insertion order; later keys overwrite earlier ones on overlap.
+        if not isinstance(mapping, dict):
+            raise TypeError(f"Expected dict mapping, got: {type(mapping).__name__}")
+        for expr, val in mapping.items():
+            if torch.is_tensor(val):
+                val = val.item()
+            idxs = [i for i, n in enumerate(dof_names) if _matches(expr, n)]
+            if len(idxs) == 0:
+                continue
+            if per_env:
+                dst[:, idxs] = float(val)
+            else:
+                dst[idxs] = float(val)
+
+    # defaults
+    if default_joint_pos_cfg is not None:
+        _apply_scalar_map(default_joint_pos, default_joint_pos_cfg, per_env=True)
+
+    # scales
+    if action_scale_cfg is not None:
+        _apply_scalar_map(action_scale, action_scale_cfg, per_env=False)
+
+    return default_joint_pos, action_scale
+
 class FTEnv(ManagerBasedRLEnv):
     def __init__(self, cfg: TrackingEnvCfg, render_mode: str | None = None, **kwargs):
         super().__init__(cfg, render_mode, **kwargs)
@@ -205,9 +263,13 @@ class FTEnv(ManagerBasedRLEnv):
             "pos": torch.zeros((self.num_envs, 5, 3), device = self.device)
         }
         self.sensor_cfg.resolve(self.scene)
+        action_scale_cfg = cfg.actions.joint_pos.scale
         self.kp, self.kd = get_pd_gains_in_dof_order(self.scene["robot"], 
                                                      self.num_envs,
                                                      device=self.device)
+        self.offset, self.action_scale = make_dof_ordered_jointpos_and_action_scale(
+            self.scene["robot"], self.num_envs, self.scene["robot"].cfg.init_state.joint_pos, action_scale_cfg
+        )
         
 
     def load_managers(self):
@@ -294,7 +356,7 @@ class FTEnv(ManagerBasedRLEnv):
                                                             self.action_manager._action,
                                                             self.lcc_bias,
                                                             physics_dt = self.physics_dt)
-            self.action_manager.update_torques(pos, torque, self.kp)
+            self.action_manager.update_torques(pos, torque, self.kp, self.action_scale)
             self.action_manager.apply_action()
 
             # Calculate acceleration
