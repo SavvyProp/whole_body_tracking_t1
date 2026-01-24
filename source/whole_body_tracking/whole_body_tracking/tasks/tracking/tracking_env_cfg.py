@@ -186,6 +186,18 @@ class EventCfg:
         },
     )
 
+    randomize_ankle_d = EventTerm(
+        func=mdp.randomize_actuator_gains,
+        mode="startup",   # recommended
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"]),
+            "stiffness_distribution_params": (0.0, 0.0),
+            "damping_distribution_params": (-1.0, 1.0),
+            "operation": "add",
+            "distribution": "uniform",
+        },
+    )
+
     # interval
     push_robot = EventTerm(
         func=mdp.push_by_setting_velocity,
