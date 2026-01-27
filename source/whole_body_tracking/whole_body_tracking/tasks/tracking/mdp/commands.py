@@ -26,7 +26,9 @@ from isaaclab.utils.math import (
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
-THRESH = 0.02
+# W2K 0.02
+# CMU_41_02 0.04
+THRESH = 0.04
 
 class MotionLoader:
     def __init__(self, motion_file: str, body_indexes: Sequence[int],
