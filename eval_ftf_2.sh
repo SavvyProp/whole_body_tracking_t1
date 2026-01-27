@@ -1,0 +1,1 @@
+python scripts/rsl_rl/tracking_play.py --task=Tracking-FTF-T1-Eval-v0 --num_envs=2 --wandb_path=ludwigtaycheeying-purdue-university/t1_lcc_29/un3a2u4k

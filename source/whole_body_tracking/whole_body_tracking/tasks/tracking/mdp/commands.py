@@ -26,6 +26,7 @@ from isaaclab.utils.math import (
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
+THRESH = 0.02
 
 class MotionLoader:
     def __init__(self, motion_file: str, body_indexes: Sequence[int],
@@ -63,7 +64,7 @@ class MotionLoader:
     def contact_state(self) -> torch.Tensor:
         body_pos_w = self._body_pos_w
         eef_pos_z = body_pos_w[:, self._eef_indexes][..., 2]
-        thresh = 0.05
+        thresh = THRESH
         return (eef_pos_z < thresh).to(torch.float32)
 
 
@@ -127,7 +128,7 @@ class MotionCommand(CommandTerm):
     def contact_state(self) -> torch.Tensor:
         body_pos_w = self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :]
         eef_pos_z = body_pos_w[:, self.eef_indexes, 2]
-        thresh = 0.05
+        thresh = THRESH
         return (eef_pos_z < thresh).to(torch.float32)
 
     @property

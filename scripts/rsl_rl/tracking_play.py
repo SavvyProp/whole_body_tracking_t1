@@ -173,6 +173,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     duration = env.unwrapped.command_manager.get_term("motion").motion.time_step_total - 1
     duration = min(duration, 10 * 50)
 
+
     sim_action = None
     sim_obs = None
     sim_pos = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
@@ -212,6 +213,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             action_ = env.unwrapped.action_manager.get_term("joint_pos")
             obs, _, _, _ = env.step(actions)
             body_ids = _get_body_indexes(command, body_names)
+
+            print(command.contact_state)
 
             sim_pos_ = command.robot_body_pos_w[:, body_ids, :] - env.unwrapped.scene.env_origins[:, None, :]
             ref_pos_ = command.body_pos_w[:, body_ids, :] - env.unwrapped.scene.env_origins[:, None, :]

@@ -3,7 +3,7 @@ from isaaclab.utils import configclass
 from whole_body_tracking.robots.t1 import T1_ACTION_SCALE, BOOSTER_T1_CFG
 from whole_body_tracking.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
 from whole_body_tracking.tasks.tracking.tracking_env_cfg import TrackingEnvCfg, TrackingEnvEvalCfg
-
+from whole_body_tracking.utils.ft import EEF_BODIES
 
 @configclass
 class T1FlatEnvCfg(TrackingEnvCfg):
@@ -29,6 +29,7 @@ class T1FlatEnvCfg(TrackingEnvCfg):
             "AR3",
             "right_hand_link",
         ]
+        self.commands.motion.eef_names = EEF_BODIES
 
 @configclass
 class T1FlatEnvEvalCfg(TrackingEnvEvalCfg):
@@ -54,6 +55,8 @@ class T1FlatEnvEvalCfg(TrackingEnvEvalCfg):
             "AR3",
             "right_hand_link",
         ]
+
+        self.commands.motion.eef_names = EEF_BODIES
 
 @configclass
 class T1FlatWoStateEstimationEnvCfg(T1FlatEnvCfg):
