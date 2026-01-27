@@ -212,13 +212,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             action_ = env.unwrapped.action_manager.get_term("joint_pos")
             obs, _, _, _ = env.step(actions)
             body_ids = _get_body_indexes(command, body_names)
-            
+
+            sim_pos_ = command.robot_body_pos_w[:, body_ids, :] - env.unwrapped.scene.env_origins[:, None, :]
+            ref_pos_ = command.body_pos_w[:, body_ids, :] - env.unwrapped.scene.env_origins[:, None, :]
+
             sim_action[c, :, :] = actions.cpu().numpy()
             sim_des_joint_pos[c, :, :] = action_.processed_actions.cpu().numpy()
-            sim_pos[c, :, :, :] = command.robot_body_pos_w[:, body_ids, :].cpu().numpy()
+            sim_pos[c, :, :, :] = sim_pos_.cpu().numpy()
             sim_vel[c, :, :, :] = command.robot_body_lin_vel_w[:, body_ids, :].cpu().numpy()
             sim_angvel[c, :, :, :] = command.robot_body_ang_vel_w[:, body_ids, :].cpu().numpy()
-            ref_pos[c, :, :, :] = command.body_pos_w[:, body_ids, :].cpu().numpy()
+            ref_pos[c, :, :, :] = ref_pos_.cpu().numpy()
             ref_vel[c, :, :, :] = command.body_lin_vel_w[:, body_ids, :].cpu().numpy()
             ref_angvel[c, :, :, :] = command.body_ang_vel_w[:, body_ids, :].cpu().numpy()
             sim_joint_pos[c, :, :] = robot.data.joint_pos.cpu().numpy()

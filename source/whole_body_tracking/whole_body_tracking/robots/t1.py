@@ -117,7 +117,7 @@ BOOSTER_T1_CFG = ArticulationCfg(
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
             stiffness=STIFFNESS_LOW,
-            damping=4.0,
+            damping=DAMPING_LOW,
             armature=ARMATURE_LOW,
         ),
         "arms": ImplicitActuatorCfg(
