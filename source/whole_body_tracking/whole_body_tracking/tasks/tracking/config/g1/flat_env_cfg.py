@@ -3,7 +3,7 @@ from isaaclab.utils import configclass
 from whole_body_tracking.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG
 from whole_body_tracking.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
 from whole_body_tracking.tasks.tracking.tracking_env_cfg import TrackingEnvCfg
-
+from whole_body_tracking.utils.ft import EEF_BODIES
 
 @configclass
 class G1FlatEnvCfg(TrackingEnvCfg):
@@ -29,6 +29,7 @@ class G1FlatEnvCfg(TrackingEnvCfg):
             "right_elbow_link",
             "right_wrist_yaw_link",
         ]
+        self.commands.motion.eef_names = EEF_BODIES
 
 
 @configclass

@@ -28,7 +28,8 @@ if TYPE_CHECKING:
 
 
 class MotionLoader:
-    def __init__(self, motion_file: str, body_indexes: Sequence[int], device: str = "cpu"):
+    def __init__(self, motion_file: str, body_indexes: Sequence[int],
+                 eef_indexes: Sequence[int], device: str = "cpu"):
         assert os.path.isfile(motion_file), f"Invalid file path: {motion_file}"
         data = np.load(motion_file)
         self.fps = data["fps"]
@@ -39,6 +40,7 @@ class MotionLoader:
         self._body_lin_vel_w = torch.tensor(data["body_lin_vel_w"], dtype=torch.float32, device=device)
         self._body_ang_vel_w = torch.tensor(data["body_ang_vel_w"], dtype=torch.float32, device=device)
         self._body_indexes = body_indexes
+        self._eef_indexes = eef_indexes
         self.time_step_total = self.joint_pos.shape[0]
 
     @property
@@ -56,6 +58,13 @@ class MotionLoader:
     @property
     def body_ang_vel_w(self) -> torch.Tensor:
         return self._body_ang_vel_w[:, self._body_indexes]
+    
+    @property
+    def contact_state(self) -> torch.Tensor:
+        body_pos_w = self._body_pos_w
+        eef_pos_z = body_pos_w[:, self._eef_indexes][..., 2]
+        thresh = 0.05
+        return (eef_pos_z < thresh).to(torch.float32)
 
 
 class MotionCommand(CommandTerm):
@@ -70,8 +79,9 @@ class MotionCommand(CommandTerm):
         self.body_indexes = torch.tensor(
             self.robot.find_bodies(self.cfg.body_names, preserve_order=True)[0], dtype=torch.long, device=self.device
         )
+        self.eef_indexes = [self.cfg.body_names.index(name) for name in self.cfg.eef_names]
 
-        self.motion = MotionLoader(self.cfg.motion_file, self.body_indexes, device=self.device)
+        self.motion = MotionLoader(self.cfg.motion_file, self.body_indexes, self.eef_indexes, device=self.device)
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
         self.body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
         self.body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)
@@ -112,6 +122,13 @@ class MotionCommand(CommandTerm):
     @property
     def body_pos_w(self) -> torch.Tensor:
         return self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :]
+    
+    @property
+    def contact_state(self) -> torch.Tensor:
+        body_pos_w = self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :]
+        eef_pos_z = body_pos_w[:, self.eef_indexes, 2]
+        thresh = 0.05
+        return (eef_pos_z < thresh).to(torch.float32)
 
     @property
     def body_quat_w(self) -> torch.Tensor:
@@ -392,6 +409,7 @@ class MotionCommandCfg(CommandTermCfg):
     motion_file: str = MISSING
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
+    eef_names: list[str] = MISSING
 
     pose_range: dict[str, tuple[float, float]] = {}
     velocity_range: dict[str, tuple[float, float]] = {}

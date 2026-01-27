@@ -98,6 +98,22 @@ def ctrl2components(act):
         "torque_weight": torque_weight
     }
 
+def ctrl2components_ftf(act):
+    des_pos = act[:, 0:CTRL_NUM]
+    des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3] * 0.25
+    des_com_angvel = act[:, CTRL_NUM + 3:CTRL_NUM + 6] * 0.50
+
+    d_gain_lin = 15.0
+    d_gain_angvel = 10.0
+
+    return {
+        "des_pos": des_pos,
+        "des_com_vel": des_com_vel,
+        "des_com_angvel": des_com_angvel,
+        "d_gain_lin": d_gain_lin,
+        "d_gain_angvel": d_gain_angvel,
+    }
+
 @torch.compile
 def make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b):
     """
@@ -441,6 +457,64 @@ def step(com_pos, com_vel,
     info["com_angvel"] = global_angvel
     info["com_acc"] = com_acc
     info["com_angacc"] = ang_acc
+    return comp_dict["des_pos"], tau, info
+
+def ftf_step(com_pos, com_vel, 
+             jacs, eefpos,
+             base_quat, base_angvel,
+             action, contact_state, nle, lcc_rand):
+    # Variant of ft step with modified action
+    # fixed contact state with weight of 2^10 for contacting and 2^-10 for non contacting
+    # no reference torque
+    comp_dict = ctrl2components_ftf(action)
+    com_vel_ = com_vel + lcc_rand["com_vel"]
+    base_angvel_ = base_angvel + lcc_rand["com_angvel"]
+    com_acc, ang_acc, global_vel, global_angvel = highlvlPD(
+        base_quat, base_angvel_,
+        comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
+        comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
+        com_vel_
+    )
+
+    idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
+    selected_jacs = jacs.index_select(1, idx)                 # (N, EEF_NUM, 6, D)
+    jacs_ = selected_jacs.reshape(selected_jacs.size(0), -1, selected_jacs.size(-1))  # (N, 6*EEF_NUM, D)
+    eefpos_ = eefpos.index_select(1, idx)                 # (N, EEF_NUM, 3)
+
+    # Add offsets to pos
+    eefpos_offset = lcc_rand["pos"][:, 1:, :]
+    eefpos_0 = eefpos_ + eefpos_offset
+    com_pos_ = com_pos + lcc_rand["pos"][:, 0, :]
+
+    # Modify jacs
+    jacs_0 = jacs_ * lcc_rand["jac_fac"]
+
+    # Modify mass
+    mass = MASS * lcc_rand["mass_fac"]
+    i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
+
+    a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b)
+    w = contact_state * 2.0 - 1.0
+    qp_q = f_mag_q(w)
+    qp_c = torch.zeros((com_pos.shape[0], qp_q.shape[-1]), device=com_pos.device, dtype=com_pos.dtype)
+
+    f = schur_solve(qp_q, qp_c, a, g)
+    candidate_tau = -jacs_0[..., :, 6:].transpose(-1, -2) @ f[..., None]
+    candidate_tau = candidate_tau.squeeze(-1)
+    candidate_tau = candidate_tau + nle
+
+    torque_limits = TORQUE_LIMITS.to(device=candidate_tau.device, dtype=candidate_tau.dtype)
+    tau = torch.clamp(candidate_tau, min=-torque_limits[None, :], max=torque_limits[None, :])
+
+    info = {
+        "f": f,
+        "candidate_tau": candidate_tau,
+        "w": w,
+        "com_vel": global_vel,
+        "com_angvel": global_angvel,
+        "com_acc": com_acc,
+        "com_angacc": ang_acc,
+    }
     return comp_dict["des_pos"], tau, info
 
 try:
