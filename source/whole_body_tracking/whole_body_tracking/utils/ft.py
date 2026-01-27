@@ -114,6 +114,28 @@ def ctrl2components_ftf(act):
         "d_gain_angvel": d_gain_angvel,
     }
 
+def ctrl2components_ftft(act):
+    des_pos = act[:, 0:CTRL_NUM]
+    des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3] * 0.25
+    des_com_angvel = act[:, CTRL_NUM + 3:CTRL_NUM + 6] * 0.50
+    des_tau = act[:, CTRL_NUM + 6:CTRL_NUM * 2 + 6]
+    torque_limits = TORQUE_LIMITS.to(device=des_tau.device, dtype=des_tau.dtype)
+    tau = torque_limits[None, :] * torch.tanh(des_tau * 0.5)
+    torque_weight = torch.square(1.0 / torque_limits)
+
+    d_gain_lin = 15.0
+    d_gain_angvel = 10.0
+
+    return {
+        "des_pos": des_pos,
+        "des_tau": tau,
+        "des_com_vel": des_com_vel,
+        "des_com_angvel": des_com_angvel,
+        "d_gain_lin": d_gain_lin,
+        "d_gain_angvel": d_gain_angvel,
+        "torque_weight": torque_weight
+    }
+
 @torch.compile
 def make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b):
     """
@@ -494,9 +516,77 @@ def ftf_step(com_pos, com_vel,
     i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
 
     a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b)
-    w = contact_state * 2.0 - 1.0
+    w = contact_state * 20.0 - 10.0
     qp_q = f_mag_q(w)
     qp_c = torch.zeros((com_pos.shape[0], qp_q.shape[-1]), device=com_pos.device, dtype=com_pos.dtype)
+
+    f = schur_solve(qp_q, qp_c, a, g)
+    candidate_tau = -jacs_0[..., :, 6:].transpose(-1, -2) @ f[..., None]
+    candidate_tau = candidate_tau.squeeze(-1)
+    candidate_tau = candidate_tau + nle
+
+    torque_limits = TORQUE_LIMITS.to(device=candidate_tau.device, dtype=candidate_tau.dtype)
+    tau = torch.clamp(candidate_tau, min=-torque_limits[None, :], max=torque_limits[None, :])
+
+    info = {
+        "f": f,
+        "candidate_tau": candidate_tau,
+        "w": w,
+        "com_vel": global_vel,
+        "com_angvel": global_angvel,
+        "com_acc": com_acc,
+        "com_angacc": ang_acc,
+    }
+    return comp_dict["des_pos"], tau, info
+
+
+def ftft_step(com_pos, com_vel, 
+             jacs, eefpos,
+             base_quat, base_angvel,
+             action, contact_state, nle, lcc_rand):
+    # Variant of ft step with modified action
+    # fixed contact state with weight of 2^10 for contacting and 2^-10 for non contacting
+    # no reference torque
+    comp_dict = ctrl2components_ftft(action)
+    com_vel_ = com_vel + lcc_rand["com_vel"]
+    base_angvel_ = base_angvel + lcc_rand["com_angvel"]
+    com_acc, ang_acc, global_vel, global_angvel = highlvlPD(
+        base_quat, base_angvel_,
+        comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
+        comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
+        com_vel_
+    )
+
+    idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
+    selected_jacs = jacs.index_select(1, idx)                 # (N, EEF_NUM, 6, D)
+    jacs_ = selected_jacs.reshape(selected_jacs.size(0), -1, selected_jacs.size(-1))  # (N, 6*EEF_NUM, D)
+    eefpos_ = eefpos.index_select(1, idx)                 # (N, EEF_NUM, 3)
+
+    # Add offsets to pos
+    eefpos_offset = lcc_rand["pos"][:, 1:, :]
+    eefpos_0 = eefpos_ + eefpos_offset
+    com_pos_ = com_pos + lcc_rand["pos"][:, 0, :]
+
+    # Modify jacs
+    jacs_0 = jacs_ * lcc_rand["jac_fac"]
+
+    # Modify mass
+    mass = MASS * lcc_rand["mass_fac"]
+    i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
+
+    weights = torch.tensor([1e-3, 1e1], device=eefpos.device, dtype=eefpos.dtype)
+    a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b)
+
+    w = contact_state * 20.0 - 10.0
+    qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
+    qp_q_ = qp_q_ * weights[0]
+    
+    jt_q_big, jt_q_small = joint_torque_q(jacs, comp_dict["tau"], comp_dict["torque_weight"])
+    jt_q_big = jt_q_big * weights[1]
+
+    qp_q = qp_q_ + jt_q_big
+    qp_c = jt_q_small * weights[1]
+    #qp_c = torch.zeros((com_pos.shape[0], qp_q.shape[-1]), device=com_pos.device, dtype=com_pos.dtype)
 
     f = schur_solve(qp_q, qp_c, a, g)
     candidate_tau = -jacs_0[..., :, 6:].transpose(-1, -2) @ f[..., None]
