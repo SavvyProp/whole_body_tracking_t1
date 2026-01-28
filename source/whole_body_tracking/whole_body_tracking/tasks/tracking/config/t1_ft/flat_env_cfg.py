@@ -55,3 +55,4 @@ class T1FTEnvEvalCfg(TrackingFTEnvEvalCfg):
             "AR3",
             "right_hand_link",
         ]
+        self.commands.motion.eef_names = EEF_BODIES
