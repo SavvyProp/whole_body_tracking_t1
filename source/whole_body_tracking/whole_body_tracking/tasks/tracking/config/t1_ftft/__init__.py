@@ -17,7 +17,7 @@ gym.register(
 )
 
 gym.register(
-    id="Tracking-FTF-T1-Eval-v0",
+    id="Tracking-FTFT-T1-Eval-v0",
     entry_point="whole_body_tracking.tasks.tracking.config.t1_ftft.ftft_env:FTFEnv",
     disable_env_checker=True,
     kwargs={
