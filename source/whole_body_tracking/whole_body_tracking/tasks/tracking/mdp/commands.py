@@ -200,6 +200,10 @@ class MotionCommand(CommandTerm):
     @property
     def robot_anchor_ang_vel_w(self) -> torch.Tensor:
         return self.robot.data.body_ang_vel_w[:, self.robot_anchor_body_index]
+    
+    @property
+    def seq_len(self) -> torch.Tensor:
+        return torch.tensor(self.motion.time_step_total, dtype=torch.float32, device=self.device)
 
     def _update_metrics(self):
         self.metrics["error_anchor_pos"] = torch.norm(self.anchor_pos_w - self.robot_anchor_pos_w, dim=-1)

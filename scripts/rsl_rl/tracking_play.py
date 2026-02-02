@@ -161,7 +161,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     )
     attach_onnx_metadata(env.unwrapped, args_cli.wandb_path if args_cli.wandb_path else "none", export_model_dir)
     # reset environment
-    obs, _ = env.get_observations()
+    obs = env.get_observations()
     motion_cmd = env.unwrapped.command_manager.get_term("motion")
     #motion_cmd.time_steps = torch.ones_like(motion_cmd.time_steps, 
     #                                         device = motion_cmd.time_steps.device) * 0
@@ -214,8 +214,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             obs, _, _, _ = env.step(actions)
             body_ids = _get_body_indexes(command, body_names)
 
-            print(command.contact_state)
-
+            
             sim_pos_ = command.robot_body_pos_w[:, body_ids, :] - env.unwrapped.scene.env_origins[:, None, :]
             ref_pos_ = command.body_pos_w[:, body_ids, :] - env.unwrapped.scene.env_origins[:, None, :]
 

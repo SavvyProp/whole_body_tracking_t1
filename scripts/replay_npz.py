@@ -99,6 +99,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         root_states[:, 10:] = motion.body_ang_vel_w[time_steps][:, 0]
 
         robot.write_root_state_to_sim(root_states)
+        print(motion.contact_state)
         robot.write_joint_state_to_sim(motion.joint_pos[time_steps], motion.joint_vel[time_steps])
         #print(robot.body_names)
         #print(robot.joint_names)

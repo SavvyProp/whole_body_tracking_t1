@@ -41,6 +41,7 @@ class _OnnxMotionPolicyExporter(_OnnxPolicyExporter):
         self.body_ang_vel_w = cmd.motion.body_ang_vel_w.to("cpu")
         self.contact_state = cmd.motion.contact_state.to("cpu")
         self.time_step_total = self.joint_pos.shape[0]
+        #self.time_step_total_tensor = torch.tensor(self.time_step_total, dtype=torch.float32).to("cpu")
 
     def forward(self, x, time_step):
         time_step_clamped = torch.clamp(time_step.long().squeeze(-1), max=self.time_step_total - 1)
@@ -111,6 +112,7 @@ def attach_onnx_metadata(env: ManagerBasedRLEnv, run_path: str, path: str, filen
         "command_names": env.command_manager.active_terms,
         "observation_names": observation_names,
         "observation_history_lengths": observation_history_lengths,
+        "seq_len": int(env.command_manager.get_term("motion").seq_len),
         "action_scale": env.action_manager.get_term("joint_pos")._scale[0].cpu().tolist(),
         "anchor_body_name": env.command_manager.get_term("motion").cfg.anchor_body_name,
         "body_names": env.command_manager.get_term("motion").cfg.body_names,
