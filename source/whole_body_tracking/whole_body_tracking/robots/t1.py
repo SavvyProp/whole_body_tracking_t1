@@ -223,11 +223,11 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
                 "Waist": ARMATURE_MID,
             },
             stiffness = {
-                ".*_Hip_Pitch": STIFFNESS_HIGH * FT_FAC,
-                ".*_Hip_Roll": STIFFNESS_MID * FT_FAC,
-                ".*_Hip_Yaw": STIFFNESS_MID * FT_FAC,
-                ".*_Knee_Pitch": STIFFNESS_HIGH * FT_FAC,
-                "Waist": STIFFNESS_MID * FT_FAC,
+                ".*_Hip_Pitch": STIFFNESS_HIGH,
+                ".*_Hip_Roll": STIFFNESS_MID,
+                ".*_Hip_Yaw": STIFFNESS_MID,
+                ".*_Knee_Pitch": STIFFNESS_HIGH,
+                "Waist": STIFFNESS_MID,
             },
             damping = {
                 ".*_Hip_Pitch": DAMPING_HIGH,# * FT_FAC * 2.0,
@@ -241,7 +241,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             joint_names_expr=[".*_Ankle_Pitch", ".*_Ankle_Roll"],
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
-            stiffness=STIFFNESS_LOW * FT_FAC,
+            stiffness=STIFFNESS_LOW,
             damping=DAMPING_LOW,# * FT_FAC * 2.0,
             armature=ARMATURE_LOW,
         ),
@@ -257,7 +257,7 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             ],
             effort_limit_sim=18.0,
             velocity_limit_sim=18.8,
-            stiffness=STIFFNESS_LOW * FT_FAC,
+            stiffness=STIFFNESS_LOW,
             damping=DAMPING_LOW, #* FT_FAC * 2.0,
             armature=ARMATURE_LOW,
         ),
@@ -301,7 +301,7 @@ for a in BOOSTER_T1_LOWGAIN_CFG.actuators.values():
     for n in names:
         if n in e and n in s and s[n]:
             print(n, e[n], s[n], d[n])
-            T1_LG_ACTION_SCALE[n] = 0.25 * e[n] / s[n]
+            T1_LG_ACTION_SCALE[n] = 0.25 * FT_FAC * e[n] / s[n]
 
 print("T1_ACTION_SCALE:", T1_ACTION_SCALE)
 print("T1_LG_ACTION_SCALE:", T1_LG_ACTION_SCALE)
