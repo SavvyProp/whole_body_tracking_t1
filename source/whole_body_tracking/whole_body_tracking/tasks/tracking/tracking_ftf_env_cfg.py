@@ -307,10 +307,10 @@ class RewardsCfg:
         weight=1.0,
         params={"command_name": "motion", "std": 3.14},
     )
-    action_rate_l2 = RewTerm(func=mdp.ft_action_rate_l2, weight=-1e-1)
+    action_rate_l2 = RewTerm(func=mdp.ft_action_rate_l2, weight=-5e-2)
     joint_limit = RewTerm(
         func=mdp.joint_pos_limits,
-        weight=-5.0,
+        weight=-10.0,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*"])},
     )
     undesired_contacts = RewTerm(
