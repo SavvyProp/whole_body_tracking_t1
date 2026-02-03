@@ -84,7 +84,7 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits)
 
-    d_gain_lin = 15.0
+    d_gain_lin = 10.0
     d_gain_angvel = 10.0
 
     return {
@@ -103,7 +103,7 @@ def ctrl2components_ftf(act):
     des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3] * 0.25
     des_com_angvel = act[:, CTRL_NUM + 3:CTRL_NUM + 6] * 0.50
 
-    d_gain_lin = 15.0
+    d_gain_lin = 10.0
     d_gain_angvel = 10.0
 
     return {
@@ -123,7 +123,7 @@ def ctrl2components_ftft(act):
     tau = torque_limits[None, :] * torch.tanh(des_tau * 0.5)
     torque_weight = torch.square(1.0 / torque_limits)
 
-    d_gain_lin = 15.0
+    d_gain_lin = 10.0
     d_gain_angvel = 10.0
 
     return {

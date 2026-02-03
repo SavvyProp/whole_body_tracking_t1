@@ -214,7 +214,7 @@ class EventCfg:
         params={
             "lcc_range":
             {
-                "vel_range": (-0.05, 0.05),
+                "vel_range": (-0.10, 0.10),
                 "angvel_range": (-0.1, 0.1),
                 "mass_fac_range": (0.9, 1.1),
                 "i_fac_range": (0.9, 1.1),
