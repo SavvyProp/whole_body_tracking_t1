@@ -307,7 +307,7 @@ class RewardsCfg:
         weight=1.0,
         params={"command_name": "motion", "std": 3.14/2.0},
     )
-    action_rate_l2 = RewTerm(func=mdp.ft_action_rate_l2, weight=-1e-2)
+    action_rate_l2 = RewTerm(func=mdp.ft_action_rate_l2, weight=-5e-2)
     joint_limit = RewTerm(
         func=mdp.joint_pos_limits,
         weight=-10.0,
