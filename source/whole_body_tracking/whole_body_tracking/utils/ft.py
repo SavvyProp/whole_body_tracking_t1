@@ -429,6 +429,7 @@ def highlvlPD(base_quat, base_angvel,
     #max_acc = 2.0
     #new_acc_mag = torch.clamp(acc_mag, max=max_acc)
     #com_acc = com_acc * (new_acc_mag / (acc_mag + 1e-6))
+    com_acc = torch.clamp(com_acc, min=-3.0, max=3.0)
 
     com_angvel = base_angvel
     ang_acc = angvel_gain * (global_des_angvel - com_angvel)
