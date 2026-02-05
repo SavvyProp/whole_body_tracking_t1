@@ -188,7 +188,9 @@ def make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b, grav_vec):
     a = f_block.permute(0, 2, 1, 3).reshape(N, 6, E * 6)
 
     g_base = eefpos.new_tensor([0.0, 0.0, -9.81, 0.0, 0.0, 0.0])  # (6,)
-    g = grav_vec + g_base[None, :]
+    gtau = torch.zeros_like(grav_vec, device=device, dtype=dtype)  # (N, 3)
+    g = torch.cate([gtau, grav_vec], axis = -1) + g_base[None, :]
+    g = g * 9.81 / torch.norm(g, dim=-1, keepdim=True)
     return a, g
 
 @torch.compile
