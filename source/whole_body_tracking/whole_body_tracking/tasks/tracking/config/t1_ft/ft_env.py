@@ -260,7 +260,8 @@ class FTEnv(ManagerBasedRLEnv):
             "mass_fac": torch.ones((self.num_envs,), device = self.device),
             "i_fac": torch.ones((self.num_envs, 3, 3), device = self.device),
             "jac_fac": torch.ones((self.num_envs, 24, 29 + 6), device = self.device),
-            "pos": torch.zeros((self.num_envs, 5, 3), device = self.device)
+            "pos": torch.zeros((self.num_envs, 5, 3), device = self.device),
+            "grav_vec": torch.zeros((self.num_envs, 3), device = self.device)
         }
         self.sensor_cfg.resolve(self.scene)
         action_scale_cfg = cfg.actions.joint_pos.scale

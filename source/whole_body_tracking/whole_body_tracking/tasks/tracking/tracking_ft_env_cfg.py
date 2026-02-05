@@ -304,7 +304,7 @@ class RewardsCfg:
     )
     motion_body_ang_vel = RewTerm(
         func=mdp.motion_global_body_angular_velocity_error_exp,
-        weight=1.5,
+        weight=1.25,
         params={"command_name": "motion", "std": 3.14/1.5},
     )
     action_rate_l2 = RewTerm(func=mdp.ft_action_rate_l2, weight=-8e-2)

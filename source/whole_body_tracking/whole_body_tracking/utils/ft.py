@@ -84,7 +84,7 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits)
 
-    d_gain_lin = 10.0
+    d_gain_lin = 15.0
     d_gain_angvel = 10.0
 
     return {
@@ -103,7 +103,7 @@ def ctrl2components_ftf(act):
     des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3] * 0.25
     des_com_angvel = act[:, CTRL_NUM + 3:CTRL_NUM + 6] * 0.50
 
-    d_gain_lin = 10.0
+    d_gain_lin = 15.0
     d_gain_angvel = 10.0
 
     return {
@@ -123,7 +123,7 @@ def ctrl2components_ftft(act):
     tau = torque_limits[None, :] * torch.tanh(des_tau * 0.5)
     torque_weight = torch.square(1.0 / torque_limits)
 
-    d_gain_lin = 10.0
+    d_gain_lin = 15.0
     d_gain_angvel = 10.0
 
     return {
@@ -137,7 +137,7 @@ def ctrl2components_ftft(act):
     }
 
 @torch.compile
-def make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b):
+def make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b, grav_vec):
     """
     Vectorized version of make_centroidal_ag without Python loops.
 
@@ -187,7 +187,8 @@ def make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b):
     # Concatenate horizontally across effectors: (N, 6, 6*E)
     a = f_block.permute(0, 2, 1, 3).reshape(N, 6, E * 6)
 
-    g = eefpos.new_tensor([0.0, 0.0, -9.81, 0.0, 0.0, 0.0])  # (6,)
+    g_base = eefpos.new_tensor([0.0, 0.0, -9.81, 0.0, 0.0, 0.0])  # (6,)
+    g = grav_vec + g_base[None, :]
     return a, g
 
 @torch.compile
@@ -367,7 +368,7 @@ def schur_solve(
 
 
 def ft_ref(
-    eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight, base_quat, mass, i_b, nle
+    eefpos_, com_pos, jacs_, tau_ref, com_ref, w, torque_weight, base_quat, mass, i_b, grav_vec, nle
 ):
     # Concat the unaccounted force component
     ctrl_num = tau_ref.shape[-1]
@@ -382,7 +383,7 @@ def ft_ref(
 
     # Ensure weights tensor matches eefpos device/dtype.
     weights = torch.tensor([1e-3, 1e1], device=eefpos.device, dtype=eefpos.dtype)
-    a, g = make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b)
+    a, g = make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b, grav_vec)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
     qp_q_ = qp_q_ * weights[0]
@@ -474,7 +475,8 @@ def step(com_pos, com_vel,
         torch.cat([com_acc, ang_acc], dim=-1),
         comp_dict["w"],
         comp_dict["torque_weight"],
-        base_quat, mass, i_b, nle
+        base_quat, mass, i_b,
+        lcc_rand["grav_vec"], nle
     )
     info["com_vel"] = global_vel
     info["com_angvel"] = global_angvel
@@ -516,7 +518,7 @@ def ftf_step(com_pos, com_vel,
     mass = MASS * lcc_rand["mass_fac"]
     i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
 
-    a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b)
+    a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b, lcc_rand["grav_vec"])
     w = contact_state * 20.0 - 10.0
     qp_q = f_mag_q(w)
     qp_c = torch.zeros((com_pos.shape[0], qp_q.shape[-1]), device=com_pos.device, dtype=com_pos.dtype)
@@ -576,7 +578,7 @@ def ftft_step(com_pos, com_vel,
     i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
 
     weights = torch.tensor([1e-3, 1e1], device=eefpos.device, dtype=eefpos.dtype)
-    a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b)
+    a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b, lcc_rand["grav_vec"])
 
     w = contact_state * 20.0 - 10.0
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)

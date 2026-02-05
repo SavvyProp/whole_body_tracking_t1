@@ -130,6 +130,7 @@ def randomize_lcc(
     i_facs = math_utils.sample_uniform(i_fac_range[0], i_fac_range[1], (len(env_ids),3, 3), device=env.device)
     jac_facs = math_utils.sample_uniform(jac_fac_range[0], jac_fac_range[1], (len(env_ids), 24, 29 + 6), device=env.device)
     pos_offsets = math_utils.sample_uniform(pos_range[0], pos_range[1], (len(env_ids), 5, 3), device=env.device)
+    grav_vec = math_utils.sample_uniform(-1.0, 1.0, (len(env_ids), 3), device=env.device)
     
     lcc_rand_dict = env.lcc_bias
     lcc_rand_dict["com_vel"][env_ids] = vel_offsets
@@ -138,4 +139,5 @@ def randomize_lcc(
     lcc_rand_dict["i_fac"][env_ids] = i_facs
     lcc_rand_dict["jac_fac"][env_ids] = jac_facs
     lcc_rand_dict["pos"][env_ids] = pos_offsets
+    lcc_rand_dict["grav_vec"][env_ids] = grav_vec
     env.lcc_bias = lcc_rand_dict
