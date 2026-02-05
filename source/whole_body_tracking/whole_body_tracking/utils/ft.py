@@ -397,6 +397,10 @@ def ft_ref(
 
     f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
+    f = torch.zeros_like(f, device=jacs.device, dtype=jacs.dtype)
+    f[:, 20] = 150.0
+    f[:, 26] = 150.0
+
     candidate_tau = -jacs[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
     candidate_tau = candidate_tau + nle
