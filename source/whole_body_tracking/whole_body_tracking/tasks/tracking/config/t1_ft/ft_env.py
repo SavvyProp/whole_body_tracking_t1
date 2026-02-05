@@ -41,6 +41,7 @@ def model_based_controller_dict(robot, r_dict, action, lcc_rand, physics_dt = 0.
     pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,
                              base_angvel, action, r_dict["nle"], lcc_rand)
+    ff_torque = ff_torque * 0.00 + 4.0 # Set all torques to 4 Nm
     info["com_vel"] = com_vel
     info["com_angvel"] = base_angvel
     # Update values in r_dict
