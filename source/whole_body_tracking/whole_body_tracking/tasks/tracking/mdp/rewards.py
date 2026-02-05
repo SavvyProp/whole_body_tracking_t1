@@ -82,11 +82,13 @@ def feet_contact_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, thresh
     return reward
 
 def contact_state(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
-    threshold = 10.0
+    threshold = 20.0
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
     net_forces_w = contact_sensor.data.net_forces_w[:, sensor_cfg.body_ids]
     contact_mask = (torch.linalg.norm(net_forces_w, dim=-1) > threshold)  # (N, |body_ids|)
-    pred_contact_mask = torch.sigmoid(env.ft_rew_info["w"][:, 1:])
+    contact_mask = torch.cat([torch.zeros(contact_mask.shape[0], 1, device=contact_mask.device, dtype=contact_mask.dtype), 
+                              contact_mask], dim=-1) # Set 0 contact ft for base 0
+    pred_contact_mask = torch.sigmoid(env.ft_rew_info["w"])
     lse = torch.sum(torch.square(contact_mask.float() - pred_contact_mask), dim=-1)
     return lse
 
@@ -176,7 +178,7 @@ def com_linacc_corectness(env: ManagerBasedRLEnv) -> torch.Tensor:
     lin_acc = env.ft_rew_info["lin_acc"]
     des_com_acc = env.ft_rew_info["com_acc"]
     lse = torch.sum(torch.square(lin_acc - des_com_acc), dim=-1)
-    sigma = 3.0
+    sigma = 6.0
     exp_err = torch.exp(-lse / (sigma ** 2))
     return exp_err
 
