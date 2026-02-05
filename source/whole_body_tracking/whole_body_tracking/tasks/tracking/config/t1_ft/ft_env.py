@@ -38,7 +38,7 @@ def model_based_controller_dict(robot, r_dict, action, lcc_rand, physics_dt = 0.
     com_pos = r_dict["com_pos"]
     body_pos_w = r_dict["body_pos_w"]
     base_quat = r_dict["base_quat"]
-    pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
+    pos, ff_torque, info = ft.step(com_pos, r_dict["jacs"],
                              body_pos_w, base_quat,
                              base_angvel, action, r_dict["nle"], lcc_rand)
     info["com_vel"] = com_vel
@@ -260,7 +260,8 @@ class FTEnv(ManagerBasedRLEnv):
             "mass_fac": torch.ones((self.num_envs,), device = self.device),
             "i_fac": torch.ones((self.num_envs, 3, 3), device = self.device),
             "jac_fac": torch.ones((self.num_envs, 24, 29 + 6), device = self.device),
-            "pos": torch.zeros((self.num_envs, 5, 3), device = self.device)
+            "pos": torch.zeros((self.num_envs, 5, 3), device = self.device),
+            "grav_vec": torch.zeros((self.num_envs, 3), device = self.device),
         }
         self.sensor_cfg.resolve(self.scene)
         action_scale_cfg = cfg.actions.joint_pos.scale
