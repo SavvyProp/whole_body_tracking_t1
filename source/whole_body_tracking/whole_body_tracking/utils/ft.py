@@ -428,10 +428,10 @@ def highlvlPD(base_quat, base_angvel,
 
     # com_acc should be clipped to a max of 5
 
-    acc_mag = torch.linalg.norm(com_acc, dim=-1, keepdim=True)
-    max_acc = 5.0
-    new_acc_mag = torch.clamp(acc_mag, max=max_acc)
-    com_acc = com_acc * (new_acc_mag / (acc_mag + 1e-6))
+    #acc_mag = torch.linalg.norm(com_acc, dim=-1, keepdim=True)
+    #max_acc = 5.0
+    #new_acc_mag = torch.clamp(acc_mag, max=max_acc)
+    #com_acc = com_acc * (new_acc_mag / (acc_mag + 1e-6))
     #com_acc = torch.clamp(com_acc, min=-3.0, max=3.0)
 
     com_angvel = base_angvel
