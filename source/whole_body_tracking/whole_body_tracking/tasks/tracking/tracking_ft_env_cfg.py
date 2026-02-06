@@ -381,13 +381,13 @@ class RewardsCfg:
 
     acc_correctness = RewTerm(
         func=mdp.com_linacc_corectness,
-        weight=0.15,
+        weight=0.10,
         params = {}
     )
 
     angacc_correctness = RewTerm(
         func=mdp.com_angacc_corectness,
-        weight=0.15,
+        weight=0.10,
         params = {}
     )
 
