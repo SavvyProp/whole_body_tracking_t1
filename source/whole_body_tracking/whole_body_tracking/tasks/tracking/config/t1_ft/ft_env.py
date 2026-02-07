@@ -32,16 +32,18 @@ def robot_dict(robot):
         "nle": nle,
     }
 
-def model_based_controller_dict(robot, r_dict, action, lcc_rand, physics_dt = 0.005):
+def model_based_controller_dict(robot, r_dict, action, lcc_rand, prev_vel, physics_dt = 0.005):
     com_vel = robot.data.root_lin_vel_w  # (N, 3)
     base_angvel = robot.data.root_com_ang_vel_w
     com_pos = r_dict["com_pos"]
     body_pos_w = r_dict["body_pos_w"]
     base_quat = r_dict["base_quat"]
-    pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
+    alpha = 0.4
+    filt_com_vel = alpha * com_vel + (1 - alpha) * prev_vel
+    pos, ff_torque, info = ft.step(com_pos, filt_com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,
                              base_angvel, action, r_dict["nle"], lcc_rand)
-    info["com_vel"] = com_vel
+    info["com_vel"] = filt_com_vel
     info["com_angvel"] = base_angvel
     # Update values in r_dict
     r_dict["com_pos"] = com_pos + com_vel * physics_dt
@@ -50,7 +52,7 @@ def model_based_controller_dict(robot, r_dict, action, lcc_rand, physics_dt = 0.
     axis = base_angvel / rot_mag[..., None]
     small_quat = quat_from_angle_axis(rot_mag * physics_dt, axis)
     r_dict["base_quat"] = quat_mul(small_quat, base_quat)
-    return pos, ff_torque, info
+    return pos, ff_torque, info, filt_com_vel
 
 def make_ft_rew_dict(robot, contact_mask, info, linacc, angacc, r_dict):
     ft_rew_dict = {
@@ -263,6 +265,7 @@ class FTEnv(ManagerBasedRLEnv):
             "pos": torch.zeros((self.num_envs, 5, 3), device = self.device),
             "grav_vec": torch.zeros((self.num_envs, 3), device = self.device)
         }
+        self.prev_vel = torch.zeros((self.num_envs, 3), device=self.device)
         self.sensor_cfg.resolve(self.scene)
         action_scale_cfg = cfg.actions.joint_pos.scale
         self.kp, self.kd = get_pd_gains_in_dof_order(self.scene["robot"], 
@@ -352,10 +355,11 @@ class FTEnv(ManagerBasedRLEnv):
             
             #r_dict["com_vel"] = self.scene["robot"].data.root_lin_vel_w
             #r_dict["base_angvel"] = self.scene["robot"].data.root_com_ang_vel_w
-            pos, torque, info = model_based_controller_dict(self.scene["robot"],
+            pos, torque, info, self.prev_vel = model_based_controller_dict(self.scene["robot"],
                                                             r_dict, 
                                                             self.action_manager._action,
                                                             self.lcc_bias,
+                                                            self.prev_vel,
                                                             physics_dt = self.physics_dt)
             self.action_manager.update_torques(pos, torque, self.kp, self.action_scale)
             self.action_manager.apply_action()
@@ -414,6 +418,7 @@ class FTEnv(ManagerBasedRLEnv):
             self.recorder_manager.record_pre_reset(reset_env_ids)
 
             self._reset_idx(reset_env_ids)
+            self.prev_vel[reset_env_ids, :] = 0.0
 
             # if sensors are added to the scene, make sure we render to reflect changes in reset
             if self.sim.has_rtx_sensors() and self.cfg.rerender_on_reset:
