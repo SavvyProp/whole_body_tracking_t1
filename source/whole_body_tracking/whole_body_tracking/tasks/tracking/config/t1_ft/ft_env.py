@@ -40,10 +40,10 @@ def model_based_controller_dict(robot, r_dict, action, lcc_rand, prev_vel, physi
     base_quat = r_dict["base_quat"]
     alpha = 0.4
     filt_com_vel = alpha * com_vel + (1 - alpha) * prev_vel
-    pos, ff_torque, info = ft.step(com_pos, filt_com_vel, r_dict["jacs"],
+    pos, ff_torque, info = ft.step(com_pos, com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,
                              base_angvel, action, r_dict["nle"], lcc_rand)
-    info["com_vel"] = filt_com_vel
+    info["com_vel"] = com_vel
     info["com_angvel"] = base_angvel
     # Update values in r_dict
     r_dict["com_pos"] = com_pos + com_vel * physics_dt
