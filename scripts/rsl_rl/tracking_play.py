@@ -162,16 +162,17 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     attach_onnx_metadata(env.unwrapped, args_cli.wandb_path if args_cli.wandb_path else "none", export_model_dir)
     # reset environment
     obs = env.get_observations()
+    ts = 100
     motion_cmd = env.unwrapped.command_manager.get_term("motion")
     #motion_cmd.time_steps = torch.ones_like(motion_cmd.time_steps, 
     #                                         device = motion_cmd.time_steps.device) * 0
     all_envs = torch.arange(env_cfg.scene.num_envs, device=motion_cmd.time_steps.device, dtype = motion_cmd.time_steps.dtype)
-    motion_cmd.reset_command(all_envs)
+    motion_cmd.reset_command(all_envs, ts)
     #obs, _ = env.get_observations()
     timestep = 0
     # simulate environment
     duration = env.unwrapped.command_manager.get_term("motion").motion.time_step_total - 1
-    duration = min(duration, 10 * 50)
+    duration = min(duration, 10 * 50) - ts
 
 
     sim_action = None

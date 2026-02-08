@@ -264,8 +264,8 @@ class MotionCommand(CommandTerm):
         self.metrics["sampling_top1_prob"][:] = pmax
         self.metrics["sampling_top1_bin"][:] = imax.float() / self.bin_count
 
-    def reset_command(self, env_ids: Sequence[int]):
-        self.time_steps[env_ids] = 0
+    def reset_command(self, env_ids: Sequence[int], timestep):
+        self.time_steps[env_ids] = timestep
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
         root_lin_vel = self.body_lin_vel_w[:, 0].clone()
