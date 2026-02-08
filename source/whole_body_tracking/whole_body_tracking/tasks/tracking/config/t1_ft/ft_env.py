@@ -38,7 +38,8 @@ def model_based_controller_dict(robot, r_dict, action, lcc_rand, prev_vel, physi
     com_pos = r_dict["com_pos"]
     body_pos_w = r_dict["body_pos_w"]
     base_quat = r_dict["base_quat"]
-    alpha = 0.4
+    #s2r_fac = 0.1
+    alpha = 0.1#1.0 - torch.exp(physics_dt * torch.log(s2r_fac) / 0.1)
     filt_com_vel = alpha * com_vel + (1 - alpha) * prev_vel
     pos, ff_torque, info = ft.step(com_pos, filt_com_vel, r_dict["jacs"],
                              body_pos_w, base_quat,

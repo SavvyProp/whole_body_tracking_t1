@@ -214,8 +214,8 @@ class EventCfg:
         params={
             "lcc_range":
             {
-                "vel_range": (-0.10, 0.10),
-                "angvel_range": (-0.10, 0.10),
+                "vel_range": (-0.20, 0.20),
+                "angvel_range": (-0.40, 0.40),
                 "mass_fac_range": (0.95, 1.05),
                 "i_fac_range": (0.95, 1.05),
                 "jac_fac_range": (0.95, 1.05),
@@ -451,10 +451,10 @@ class TrackingFTEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self):
         """Post initialization."""
         # general settings
-        self.decimation = 5
+        self.decimation = 10
         self.episode_length_s = 10.0
         # simulation settings
-        self.sim.dt = 0.004
+        self.sim.dt = 0.002
         self.sim.render_interval = self.decimation
         self.sim.physics_material = self.scene.terrain.physics_material
         self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
