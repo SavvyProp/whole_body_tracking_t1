@@ -274,7 +274,7 @@ class EventEvalCfg:
 
 
 @configclass
-class RewardsCfg:
+class RewardsBaseCfg:
     """Reward terms for the MDP."""
 
     motion_global_anchor_pos = RewTerm(
@@ -326,26 +326,6 @@ class RewardsCfg:
             "threshold": 1.0,
         },
     )
-    contact_ft = RewTerm(
-        func=mdp.contact_state,
-        weight=-0.25,
-        params={
-            "sensor_cfg": SceneEntityCfg(
-                "contact_forces",
-                body_names=EEF_BODIES
-            ),
-        }
-    )
-    #centroid_vel = RewTerm(
-    #    func=mdp.centroid_velocity,
-    #    weight=0.1,
-    #    params = {}
-    #)
-    #centroid_angvel = RewTerm(
-    #    func=mdp.centroid_angular_velocity,
-    #    weight=0.05,
-    #    params = {}
-    #)
     force_correctness = RewTerm(
         func=mdp.ft_force_correctness,
         weight=0.15,
@@ -356,29 +336,11 @@ class RewardsCfg:
             ),
         }
     )
-    #tau_ref = RewTerm(
-    #    func=mdp.ft_tau_ref,
-    #    weight=0.1,
-    #    params = {}
-    #)
     tau_limit = RewTerm(
         func=mdp.ft_tau_limit,
         weight=-0.1,
         params = {}
     )
-
-    #acc_mag = RewTerm(
-    #    func=mdp.com_acc_magnitude,
-    #    weight=-0.1,
-    #    params = {}
-    #)
-
-    #angacc_mag = RewTerm(
-    #    func=mdp.com_angacc_magnitude,
-    #    weight=-0.1,
-    #    params = {}
-    #)
-
     acc_correctness = RewTerm(
         func=mdp.com_linacc_corectness,
         weight=0.10,
@@ -391,6 +353,19 @@ class RewardsCfg:
         params = {}
     )
 
+@configclass
+class RewardsFTCfg(RewardsBaseCfg):
+    """Reward terms for the MDP."""
+    contact_ft = RewTerm(
+        func=mdp.contact_state,
+        weight=-0.25,
+        params={
+            "sensor_cfg": SceneEntityCfg(
+                "contact_forces",
+                body_names=EEF_BODIES
+            ),
+        }
+    )
 
 @configclass
 class TerminationsCfg:
@@ -443,7 +418,7 @@ class TrackingFTEnvCfg(ManagerBasedRLEnvCfg):
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()
     # MDP settings
-    rewards: RewardsCfg = RewardsCfg()
+    rewards: RewardsFTCfg = RewardsFTCfg()
     terminations: TerminationsCfg = TerminationsCfg()
     events: EventCfg = EventCfg()
     curriculum: CurriculumCfg = CurriculumCfg()
@@ -475,7 +450,7 @@ class TrackingFTEnvEvalCfg(ManagerBasedRLEnvCfg):
     actions: ActionsCfg = ActionsCfg()
     commands: CommandsCfg = CommandsCfg()
     # MDP settings
-    rewards: RewardsCfg = RewardsCfg()
+    rewards: RewardsFTCfg = RewardsFTCfg()
     terminations: TerminationsCfg = TerminationsCfg()
     events: EventEvalCfg = EventEvalCfg()
     curriculum: CurriculumCfg = CurriculumCfg()
@@ -495,4 +470,65 @@ class TrackingFTEnvEvalCfg(ManagerBasedRLEnvCfg):
         self.viewer.origin_type = "asset_root"
         self.viewer.asset_name = "robot"
 
+@configclass
+class TrackingFTFEnvCfg(ManagerBasedRLEnvCfg):
+    """Configuration for the locomotion velocity-tracking environment."""
 
+    # Scene settings
+    scene: MySceneCfg = MySceneCfg(num_envs=8192, env_spacing=2.5)
+    # Basic settings
+    observations: ObservationsCfg = ObservationsCfg()
+    actions: ActionsCfg = ActionsCfg()
+    commands: CommandsCfg = CommandsCfg()
+    # MDP settings
+    rewards: RewardsBaseCfg = RewardsBaseCfg()
+    terminations: TerminationsCfg = TerminationsCfg()
+    events: EventCfg = EventCfg()
+    curriculum: CurriculumCfg = CurriculumCfg()
+
+    def __post_init__(self):
+        """Post initialization."""
+        # general settings
+        self.decimation = 4
+        self.episode_length_s = 10.0
+        # simulation settings
+        self.sim.dt = 0.005
+        self.sim.render_interval = self.decimation
+        self.sim.physics_material = self.scene.terrain.physics_material
+        self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
+        # viewer settings
+        self.viewer.eye = (1.5, 1.5, 1.5)
+        self.viewer.origin_type = "asset_root"
+        self.viewer.asset_name = "robot"
+
+
+@configclass
+class TrackingFTFEnvEvalCfg(ManagerBasedRLEnvCfg):
+    """Configuration for the locomotion velocity-tracking environment."""
+
+    # Scene settings
+    scene: MySceneCfg = MySceneCfg(num_envs=8192, env_spacing=2.5)
+    # Basic settings
+    observations: ObservationsCfg = ObservationsCfg()
+    actions: ActionsCfg = ActionsCfg()
+    commands: CommandsCfg = CommandsCfg()
+    # MDP settings
+    rewards: RewardsBaseCfg = RewardsBaseCfg()
+    terminations: TerminationsCfg = TerminationsCfg()
+    events: EventEvalCfg = EventEvalCfg()
+    curriculum: CurriculumCfg = CurriculumCfg()
+
+    def __post_init__(self):
+        """Post initialization."""
+        # general settings
+        self.decimation = 10
+        self.episode_length_s = 10.0
+        # simulation settings
+        self.sim.dt = 0.002
+        self.sim.render_interval = self.decimation
+        self.sim.physics_material = self.scene.terrain.physics_material
+        self.sim.physx.gpu_max_rigid_patch_count = 10 * 2**15
+        # viewer settings
+        self.viewer.eye = (1.5, 1.5, 1.5)
+        self.viewer.origin_type = "asset_root"
+        self.viewer.asset_name = "robot"

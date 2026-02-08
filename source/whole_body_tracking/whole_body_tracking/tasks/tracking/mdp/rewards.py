@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor
 from isaaclab.utils.math import quat_error_magnitude
+from whole_body_tracking.utils.ft import CTRL_NUM, EEF_NUM
 
 from whole_body_tracking.tasks.tracking.mdp.commands import MotionCommand
 
@@ -116,14 +117,24 @@ def centroid_angular_velocity(env: ManagerBasedRLEnv):
 
 def ft_action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     """Penalize the rate of change of the actions using L2 squared kernel."""
-    pos_component = env.action_manager.action[:, :23]
-    remaining_component = env.action_manager.action[:, 23:]
-    pos_prev = env.action_manager.prev_action[:, :23]
-    remaining_prev = env.action_manager.prev_action[:, 23:]
-    pos_l2_err = torch.sum(torch.square(pos_component - pos_prev), dim=1)
-    remaining_l2_err = torch.sum(torch.square(remaining_component - remaining_prev), dim=1)
-    return pos_l2_err + remaining_l2_err * 0.10
-
+    def slice_action(vec):
+        des_pos = vec[:, 0:CTRL_NUM]
+        des_com_vel = vec[:, CTRL_NUM:CTRL_NUM + 3]
+        w = vec[:, CTRL_NUM + 3 : CTRL_NUM + EEF_NUM + 4]
+        torque = vec[:, CTRL_NUM + EEF_NUM + 4:
+                CTRL_NUM * 2 + EEF_NUM + 4]
+        des_com_angvel = vec[:, CTRL_NUM * 2 + EEF_NUM + 4:
+                    CTRL_NUM * 2 + EEF_NUM + 7]
+        non_w = torch.cat([
+            des_com_vel, torque, des_com_angvel
+        ], axis = -1)
+        return des_pos, non_w, w
+    c_pos, c_rem, c_w = slice_action(env.action_manager.action)
+    p_pos, p_rem, p_w = slice_action(env.action_manager.prev_action)
+    pos_l2_err = torch.sum(torch.square(c_pos - p_pos), dim=-1)
+    remaining_l2_err = torch.sum(torch.square(c_rem - p_rem), dim=-1)
+    w_l2_err = torch.sum(torch.square(c_w - p_w), dim=-1)
+    return pos_l2_err + remaining_l2_err * 0.10 + w_l2_err * 1e-3
 
 def ft_force_correctness(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]

@@ -2,7 +2,7 @@ from isaaclab.utils import configclass
 
 from whole_body_tracking.robots.t1 import T1_LG_ACTION_SCALE, BOOSTER_T1_LOWGAIN_CFG
 from whole_body_tracking.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
-from whole_body_tracking.tasks.tracking.tracking_ftf_env_cfg import TrackingFTFEnvCfg, TrackingFTFEnvEvalCfg
+from whole_body_tracking.tasks.tracking.tracking_ft_env_cfg import TrackingFTFEnvCfg, TrackingFTFEnvEvalCfg
 from whole_body_tracking.utils.ft import EEF_BODIES
 
 @configclass
