@@ -28,7 +28,8 @@ if TYPE_CHECKING:
 
 # W2K 0.02
 # CMU_41_02 0.04
-THRESH = 0.07
+# W2K 0.01
+THRESH = 0.01
 
 class MotionLoader:
     def __init__(self, motion_file: str, body_indexes: Sequence[int],
@@ -83,6 +84,8 @@ class MotionCommand(CommandTerm):
             self.robot.find_bodies(self.cfg.body_names, preserve_order=True)[0], dtype=torch.long, device=self.device
         )
         self.eef_indexes = [self.cfg.body_names.index(name) for name in self.cfg.eef_names]
+        #print(self.body_indexes)
+        #print(self.eef_indexes)
 
         self.motion = MotionLoader(self.cfg.motion_file, self.body_indexes, self.eef_indexes, device=self.device)
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)

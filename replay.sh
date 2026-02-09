@@ -1,1 +1,1 @@
-python scripts/replay_npz.py --registry_name=ludwigtaycheeying-purdue-university-org/wandb-registry-motions/lafan_jumps
+python scripts/replay_npz.py --registry_name=ludwigtaycheeying-purdue-university-org/wandb-registry-motions/accad_W2K

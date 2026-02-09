@@ -78,9 +78,12 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     artifact = api.artifact(registry_name)
     motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
     eef_ids = [10, 13, 3, 6]
+    body_ids = torch.tensor([ 0, 12, 20, 28, 13, 21, 29,  4,  6, 10, 26,  7, 11, 27],
+       device='cuda:0')
+    #[10, 13, 3, 6]
     motion = MotionLoader(
         motion_file,
-        torch.tensor([0], dtype=torch.long, device=sim.device),
+        body_ids,
         eef_ids,
         sim.device,
     )
