@@ -134,7 +134,7 @@ def ft_action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
     pos_l2_err = torch.sum(torch.square(c_pos - p_pos), dim=-1)
     remaining_l2_err = torch.sum(torch.square(c_rem - p_rem), dim=-1)
     w_l2_err = torch.sum(torch.square(c_w - p_w), dim=-1)
-    return pos_l2_err + remaining_l2_err * 0.10 + w_l2_err * 1e-3
+    return pos_l2_err + remaining_l2_err * 0.10 + w_l2_err * 1e-2
 
 def ft_force_correctness(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
