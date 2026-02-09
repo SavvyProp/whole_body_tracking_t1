@@ -77,11 +77,11 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     api = wandb.Api()
     artifact = api.artifact(registry_name)
     motion_file = str(pathlib.Path(artifact.download()) / "motion.npz")
-
+    eef_ids = [10, 13, 3, 6]
     motion = MotionLoader(
         motion_file,
         torch.tensor([0], dtype=torch.long, device=sim.device),
-        torch.tensor([0], dtype=torch.long, device=sim.device),
+        eef_ids,
         sim.device,
     )
     time_steps = torch.zeros(scene.num_envs, dtype=torch.long, device=sim.device)
@@ -99,7 +99,7 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         root_states[:, 10:] = motion.body_ang_vel_w[time_steps][:, 0]
 
         robot.write_root_state_to_sim(root_states)
-        print(motion.contact_state)
+        print(motion.contact_state[time_steps, :])
         robot.write_joint_state_to_sim(motion.joint_pos[time_steps], motion.joint_vel[time_steps])
         #print(robot.body_names)
         #print(robot.joint_names)

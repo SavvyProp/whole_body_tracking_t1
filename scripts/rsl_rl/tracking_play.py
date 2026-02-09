@@ -215,6 +215,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             obs, _, _, _ = env.step(actions)
             body_ids = _get_body_indexes(command, body_names)
 
+            print(command.contact_state)
+
             
             sim_pos_ = command.robot_body_pos_w[:, body_ids, :] - env.unwrapped.scene.env_origins[:, None, :]
             ref_pos_ = command.body_pos_w[:, body_ids, :] - env.unwrapped.scene.env_origins[:, None, :]
