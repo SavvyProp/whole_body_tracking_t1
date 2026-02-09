@@ -83,6 +83,8 @@ class MotionCommand(CommandTerm):
             self.robot.find_bodies(self.cfg.body_names, preserve_order=True)[0], dtype=torch.long, device=self.device
         )
         self.eef_indexes = [self.cfg.body_names.index(name) for name in self.cfg.eef_names]
+        ankle_joint_ids, ankle_joint_names = self.robot.find_joints(self.cfg.ankle_names, preserve_order=True)
+        self.ankle_joint_ids = ankle_joint_ids
 
         self.motion = MotionLoader(self.cfg.motion_file, self.body_indexes, self.eef_indexes, device=self.device)
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
@@ -286,7 +288,10 @@ class MotionCommand(CommandTerm):
         joint_pos = self.joint_pos.clone()
         joint_vel = self.joint_vel.clone()
 
-        joint_pos += sample_uniform(*self.cfg.joint_position_range, joint_pos.shape, joint_pos.device)
+        joint_offset = sample_uniform(*self.cfg.joint_position_range, joint_pos.shape, joint_pos.device)
+        joint_offset[:, self.ankle_joint_ids] *= 1.5  # Double ankle randomization
+
+        joint_pos += joint_offset
         soft_joint_pos_limits = self.robot.data.soft_joint_pos_limits[env_ids]
         joint_pos[env_ids] = torch.clip(
             joint_pos[env_ids], soft_joint_pos_limits[:, :, 0], soft_joint_pos_limits[:, :, 1]
@@ -322,7 +327,10 @@ class MotionCommand(CommandTerm):
         joint_pos = self.joint_pos.clone()
         joint_vel = self.joint_vel.clone()
 
-        joint_pos += sample_uniform(*self.cfg.joint_position_range, joint_pos.shape, joint_pos.device)
+        joint_offset = sample_uniform(*self.cfg.joint_position_range, joint_pos.shape, joint_pos.device)
+        joint_offset[:, self.ankle_joint_ids] *= 1.5  # Double ankle randomization
+        joint_pos += joint_offset
+
         soft_joint_pos_limits = self.robot.data.soft_joint_pos_limits[env_ids]
         joint_pos[env_ids] = torch.clip(
             joint_pos[env_ids], soft_joint_pos_limits[:, :, 0], soft_joint_pos_limits[:, :, 1]
@@ -417,6 +425,7 @@ class MotionCommandCfg(CommandTermCfg):
     anchor_body_name: str = MISSING
     body_names: list[str] = MISSING
     eef_names: list[str] = MISSING
+    ankle_names: list[str] = MISSING
 
     pose_range: dict[str, tuple[float, float]] = {}
     velocity_range: dict[str, tuple[float, float]] = {}

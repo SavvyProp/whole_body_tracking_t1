@@ -1,9 +1,10 @@
 from isaaclab.utils import configclass
 
 from whole_body_tracking.robots.t1 import T1_LG_ACTION_SCALE, BOOSTER_T1_LOWGAIN_CFG
-from whole_body_tracking.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
 from whole_body_tracking.tasks.tracking.tracking_ft_env_cfg import TrackingFTEnvCfg, TrackingFTEnvEvalCfg
-from whole_body_tracking.utils.ft import EEF_BODIES
+from whole_body_tracking.utils.ft import EEF_BODIES, ANKLE_NAMES
+
+
 
 @configclass
 class T1FTEnvCfg(TrackingFTEnvCfg):
@@ -30,6 +31,7 @@ class T1FTEnvCfg(TrackingFTEnvCfg):
             "right_hand_link",
         ]
         self.commands.motion.eef_names = EEF_BODIES
+        self.commands.motion.ankle_names = ANKLE_NAMES
 
 @configclass
 class T1FTEnvEvalCfg(TrackingFTEnvEvalCfg):
@@ -56,3 +58,4 @@ class T1FTEnvEvalCfg(TrackingFTEnvEvalCfg):
             "right_hand_link",
         ]
         self.commands.motion.eef_names = EEF_BODIES
+        self.commands.motion.ankle_names = ANKLE_NAMES
