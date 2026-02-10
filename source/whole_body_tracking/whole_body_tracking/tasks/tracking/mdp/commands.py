@@ -29,7 +29,8 @@ if TYPE_CHECKING:
 # W2K 0.02
 # CMU_41_02 0.04
 # W2K 0.01
-THRESH = 0.01
+# Jumps 0.06
+THRESH = 0.04
 
 class MotionLoader:
     def __init__(self, motion_file: str, body_indexes: Sequence[int],
@@ -66,7 +67,7 @@ class MotionLoader:
     @property
     def contact_state(self) -> torch.Tensor:
         body_pos_w = self._body_pos_w
-        eef_pos_z = body_pos_w[:, self._eef_indexes][..., 2]
+        eef_pos_z = body_pos_w[:, self._body_indexes][:, self._eef_indexes, 2]
         thresh = THRESH
         return (eef_pos_z < thresh).to(torch.float32)
 
@@ -131,10 +132,11 @@ class MotionCommand(CommandTerm):
     
     @property
     def contact_state(self) -> torch.Tensor:
-        body_pos_w = self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :]
-        eef_pos_z = body_pos_w[:, self.eef_indexes, 2]
-        thresh = THRESH
-        return (eef_pos_z < thresh).to(torch.float32)
+        #body_pos_w = self.motion.body_pos_w[self.time_steps] + self._env.scene.env_origins[:, None, :]
+        #eef_pos_z = body_pos_w[:, self.eef_indexes, 2]
+        #thresh = THRESH
+        #return (eef_pos_z < thresh).to(torch.float32)
+        return self.motion.contact_state[self.time_steps]
 
     @property
     def body_quat_w(self) -> torch.Tensor:

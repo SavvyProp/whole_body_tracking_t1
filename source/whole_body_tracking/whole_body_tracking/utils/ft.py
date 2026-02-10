@@ -5,7 +5,8 @@ from torch._dynamo import disable
 bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'AL4', 'AR4', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'AL5', 'AR5', 'Shank_Left', 'Shank_Right', 'AL6', 'AR6', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_hand_link', 'right_hand_link', 'left_foot_link', 'right_foot_link']
 joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 'Head_pitch', 'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 'Left_Hip_Pitch', 'Right_Hip_Pitch', 'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 'Left_Hip_Roll', 'Right_Hip_Roll', 'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 'Left_Hip_Yaw', 'Right_Hip_Yaw', 'Left_Wrist_Pitch', 'Right_Wrist_Pitch', 'Left_Knee_Pitch', 'Right_Knee_Pitch', 'Left_Wrist_Yaw', 'Right_Wrist_Yaw', 'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 'Left_Hand_Roll', 'Right_Hand_Roll', 'Left_Ankle_Roll', 'Right_Ankle_Roll']
 
-
+ANKLE_NAMES = ["Left_Ankle_Pitch", "Right_Ankle_Pitch",
+               "Left_Ankle_Roll", "Right_Ankle_Roll"]
 
 TORQUE_LIMITS = torch.tensor([
     7, 
@@ -84,7 +85,7 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits)
 
-    d_gain_lin = 15.0
+    d_gain_lin = 10.0
     d_gain_angvel = 10.0
 
     return {
