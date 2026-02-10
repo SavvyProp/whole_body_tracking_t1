@@ -48,17 +48,29 @@ class MySceneCfg(InteractiveSceneCfg):
     # ground terrain
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
-        terrain_type="plane",
+        terrain_type="generator",
+        terrain_generator=TerrainGeneratorCfg(
+            size=(8.0, 8.0),          # meters
+            num_rows=16,
+            num_cols=16,
+            horizontal_scale=0.20,    # smaller => finer bumps
+            vertical_scale=0.001,     # larger => taller bumps
+            difficulty_range=(0.0, 1.0),
+            sub_terrains={
+                "rough": hf.HfRandomUniformTerrainCfg(
+                    proportion=0.6,
+                    noise_range=(0.0, 0.04),
+                    noise_step=0.005,
+                    downsampled_scale=0.2,
+                )
+            },
+        ),
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
             restitution_combine_mode="multiply",
             static_friction=1.0,
             dynamic_friction=1.0,
-        ),
-        visual_material=sim_utils.MdlFileCfg(
-            mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
-            project_uvw=True,
         ),
     )
     # robots
