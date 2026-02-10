@@ -48,29 +48,17 @@ class MySceneCfg(InteractiveSceneCfg):
     # ground terrain
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
-        terrain_type="generator",
-        terrain_generator=TerrainGeneratorCfg(
-            size=(8.0, 8.0),          # meters
-            num_rows=16,
-            num_cols=16,
-            horizontal_scale=0.20,    # smaller => finer bumps
-            vertical_scale=0.001,     # larger => taller bumps
-            difficulty_range=(0.0, 1.0),
-            sub_terrains={
-                "rough": hf.HfRandomUniformTerrainCfg(
-                    proportion=0.6,
-                    noise_range=(0.0, 0.04),
-                    noise_step=0.005,
-                    downsampled_scale=0.2,
-                )
-            },
-        ),
+        terrain_type="plane",
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
             restitution_combine_mode="multiply",
             static_friction=1.0,
             dynamic_friction=1.0,
+        ),
+        visual_material=sim_utils.MdlFileCfg(
+            mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
+            project_uvw=True,
         ),
     )
     # robots
@@ -133,7 +121,7 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-        history_length = 6
+        history_length = 4
         # observation terms (order preserved)
         command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
         #motion_anchor_pos_b = ObsTerm(
@@ -144,8 +132,27 @@ class ObservationsCfg:
         #)
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5))
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.0, n_max=1.0))
+        joint_pos_hi = ObsTerm(
+            func=mdp.joint_pos_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
+            noise=Unoise(n_min=-0.1, n_max=0.1),
+        )
+        joint_pos_lo = ObsTerm(
+            func=mdp.joint_pos_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"])},
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+        )
+        #joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        joint_vel_hi = ObsTerm(
+            func=mdp.joint_vel_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
+            noise=Unoise(n_min=-1.5, n_max=1.5),
+        )
+        joint_vel_lo = ObsTerm(
+            func=mdp.joint_vel_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"])},
+            noise=Unoise(n_min=-0.5, n_max=0.5),
+        )
         actions = ObsTerm(func=mdp.last_action)
         def __post_init__(self):
             self.enable_corruption = True
@@ -508,4 +515,3 @@ class TrackingFTEnvEvalCfg(ManagerBasedRLEnvCfg):
         self.viewer.eye = (1.5, 1.5, 1.5)
         self.viewer.origin_type = "asset_root"
         self.viewer.asset_name = "robot"
-
