@@ -99,7 +99,7 @@ class CommandsCfg:
             "yaw": (-0.2, 0.2),
         },
         velocity_range=VELOCITY_RANGE,
-        joint_position_range=(-0.15, 0.15),
+        joint_position_range=(-0.1, 0.1),
     )
 
 
@@ -133,7 +133,7 @@ class ObservationsCfg:
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5))
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
         joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.5, n_max=1.5))
+        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.0, n_max=1.0))
         actions = ObsTerm(func=mdp.last_action)
         def __post_init__(self):
             self.enable_corruption = True

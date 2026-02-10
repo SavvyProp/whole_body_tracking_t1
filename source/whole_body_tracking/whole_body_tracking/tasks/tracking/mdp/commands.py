@@ -289,7 +289,7 @@ class MotionCommand(CommandTerm):
         joint_vel = self.joint_vel.clone()
 
         joint_offset = sample_uniform(*self.cfg.joint_position_range, joint_pos.shape, joint_pos.device)
-        joint_offset[:, self.ankle_joint_ids] *= 1.5  # Double ankle randomization
+        joint_offset[:, self.ankle_joint_ids] *= 1.0  # Double ankle randomization
 
         joint_pos += joint_offset
         soft_joint_pos_limits = self.robot.data.soft_joint_pos_limits[env_ids]
@@ -328,7 +328,7 @@ class MotionCommand(CommandTerm):
         joint_vel = self.joint_vel.clone()
 
         joint_offset = sample_uniform(*self.cfg.joint_position_range, joint_pos.shape, joint_pos.device)
-        joint_offset[:, self.ankle_joint_ids] *= 1.5  # Double ankle randomization
+        joint_offset[:, self.ankle_joint_ids] *= 1.0  # Double ankle randomization
         joint_pos += joint_offset
 
         soft_joint_pos_limits = self.robot.data.soft_joint_pos_limits[env_ids]
