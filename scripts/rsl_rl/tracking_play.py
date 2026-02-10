@@ -207,6 +207,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             if sim_obs is None:
                 sim_obs = np.zeros((duration, env_cfg.scene.num_envs, pol_obs.shape[-1]))
             sim_obs[c, :, :] = pol_obs.cpu().numpy()
+            print(pol_obs.cpu().numpy()[0, :])
 
             robot = env.unwrapped.scene["robot"]
             command = env.unwrapped.command_manager.get_term("motion")
