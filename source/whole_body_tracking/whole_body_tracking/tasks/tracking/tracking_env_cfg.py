@@ -57,8 +57,7 @@ class MySceneCfg(InteractiveSceneCfg):
             difficulty_range=(0.0, 1.0),
             sub_terrains={
                 "rough": hf.HfRandomUniformTerrainCfg(
-                    proportion=0.6,
-                    noise_range=(0.0, 0.04),
+                    noise_range=(0.0, 0.02),
                     noise_step=0.005,
                     downsampled_scale=0.2,
                 )
