@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 # CMU_41_02 0.04
 # W2K 0.01
 # Jumps 0.06
-THRESH = 0.04
+THRESH = 0.02
 
 class MotionLoader:
     def __init__(self, motion_file: str, body_indexes: Sequence[int],
