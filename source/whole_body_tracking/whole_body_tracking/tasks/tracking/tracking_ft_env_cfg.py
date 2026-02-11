@@ -76,6 +76,52 @@ class MySceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True, force_threshold=10.0, debug_vis=True
     )
 
+@configclass
+class RoughSceneCfg(InteractiveSceneCfg):
+    """Configuration for the terrain scene with a legged robot."""
+
+    # ground terrain
+    terrain = TerrainImporterCfg(
+        prim_path="/World/ground",
+        terrain_type="generator",
+        terrain_generator=TerrainGeneratorCfg(
+            size=(8.0, 8.0),          # meters
+            num_rows=16,
+            num_cols=16,
+            horizontal_scale=0.20,    # smaller => finer bumps
+            vertical_scale=0.005,     # larger => taller bumps
+            difficulty_range=(0.0, 1.0),
+            sub_terrains={
+                "rough": hf.HfRandomUniformTerrainCfg(
+                    noise_range=(0.0, 0.03),
+                    noise_step=0.005,
+                    downsampled_scale=0.2,
+                )
+            },
+        ),
+        collision_group=-1,
+        physics_material=sim_utils.RigidBodyMaterialCfg(
+            friction_combine_mode="multiply",
+            restitution_combine_mode="multiply",
+            static_friction=1.0,
+            dynamic_friction=1.0,
+        ),
+    )
+    # robots
+    robot: ArticulationCfg = MISSING
+    # lights
+    light = AssetBaseCfg(
+        prim_path="/World/light",
+        spawn=sim_utils.DistantLightCfg(color=(0.75, 0.75, 0.75), intensity=3000.0),
+    )
+    sky_light = AssetBaseCfg(
+        prim_path="/World/skyLight",
+        spawn=sim_utils.DomeLightCfg(color=(0.13, 0.13, 0.13), intensity=1000.0),
+    )
+    contact_forces = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True, force_threshold=10.0, debug_vis=True
+    )
+
 
 ##
 # MDP settings
@@ -470,7 +516,7 @@ class TrackingFTEnvCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: RoughSceneCfg = RoughSceneCfg(num_envs=4096, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -502,7 +548,7 @@ class TrackingFTEnvEvalCfg(ManagerBasedRLEnvCfg):
     """Configuration for the locomotion velocity-tracking environment."""
 
     # Scene settings
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: RoughSceneCfg = RoughSceneCfg(num_envs=4096, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()

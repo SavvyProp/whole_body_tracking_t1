@@ -297,7 +297,7 @@ class MotionCommand(CommandTerm):
             joint_pos[env_ids], soft_joint_pos_limits[:, :, 0], soft_joint_pos_limits[:, :, 1]
         )
         self.robot.write_joint_state_to_sim(joint_pos[env_ids], joint_vel[env_ids], env_ids=env_ids)
-        offset = torch.tensor([[0.0, 0.0, 0.0]], device=self.device)
+        offset = torch.tensor([[0.0, 0.0, 0.05]], device=self.device)
         self.robot.write_root_state_to_sim(
             torch.cat([root_pos[env_ids] + offset, root_ori[env_ids], root_lin_vel[env_ids], root_ang_vel[env_ids]], dim=-1),
             env_ids=env_ids,
@@ -339,7 +339,7 @@ class MotionCommand(CommandTerm):
         self.robot.write_joint_state_to_sim(joint_pos[env_ids], joint_vel[env_ids], env_ids=env_ids)
         offset = torch.tensor([[0.0, 0.0, 0.05]], device=self.device)
         self.robot.write_root_state_to_sim(
-            torch.cat([root_pos[env_ids], root_ori[env_ids], root_lin_vel[env_ids], root_ang_vel[env_ids]], dim=-1),
+            torch.cat([root_pos[env_ids] + offset, root_ori[env_ids], root_lin_vel[env_ids], root_ang_vel[env_ids]], dim=-1),
             env_ids=env_ids,
         )
 
