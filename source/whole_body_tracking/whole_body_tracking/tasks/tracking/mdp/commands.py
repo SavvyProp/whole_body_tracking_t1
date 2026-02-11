@@ -289,7 +289,7 @@ class MotionCommand(CommandTerm):
         joint_vel = self.joint_vel.clone()
 
         joint_offset = sample_uniform(*self.cfg.joint_position_range, joint_pos.shape, joint_pos.device)
-        joint_offset[:, self.ankle_joint_ids] *= 1.0  # Double ankle randomization
+        joint_offset[:, self.ankle_joint_ids] *= 4.0  # Double ankle randomization
 
         joint_pos += joint_offset
         soft_joint_pos_limits = self.robot.data.soft_joint_pos_limits[env_ids]
@@ -297,7 +297,7 @@ class MotionCommand(CommandTerm):
             joint_pos[env_ids], soft_joint_pos_limits[:, :, 0], soft_joint_pos_limits[:, :, 1]
         )
         self.robot.write_joint_state_to_sim(joint_pos[env_ids], joint_vel[env_ids], env_ids=env_ids)
-        offset = torch.tensor([[0.0, 0.0, 0.05]], device=self.device)
+        offset = torch.tensor([[0.0, 0.0, 0.0]], device=self.device)
         self.robot.write_root_state_to_sim(
             torch.cat([root_pos[env_ids] + offset, root_ori[env_ids], root_lin_vel[env_ids], root_ang_vel[env_ids]], dim=-1),
             env_ids=env_ids,
@@ -329,7 +329,7 @@ class MotionCommand(CommandTerm):
         joint_vel = self.joint_vel.clone()
 
         joint_offset = sample_uniform(*self.cfg.joint_position_range, joint_pos.shape, joint_pos.device)
-        joint_offset[:, self.ankle_joint_ids] *= 1.0  # Double ankle randomization
+        joint_offset[:, self.ankle_joint_ids] *= 4.0  # Double ankle randomization
         joint_pos += joint_offset
 
         soft_joint_pos_limits = self.robot.data.soft_joint_pos_limits[env_ids]
@@ -337,6 +337,7 @@ class MotionCommand(CommandTerm):
             joint_pos[env_ids], soft_joint_pos_limits[:, :, 0], soft_joint_pos_limits[:, :, 1]
         )
         self.robot.write_joint_state_to_sim(joint_pos[env_ids], joint_vel[env_ids], env_ids=env_ids)
+        offset = torch.tensor([[0.0, 0.0, 0.05]], device=self.device)
         self.robot.write_root_state_to_sim(
             torch.cat([root_pos[env_ids], root_ori[env_ids], root_lin_vel[env_ids], root_ang_vel[env_ids]], dim=-1),
             env_ids=env_ids,

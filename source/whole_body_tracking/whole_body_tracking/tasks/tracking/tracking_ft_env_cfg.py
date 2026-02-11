@@ -48,22 +48,7 @@ class MySceneCfg(InteractiveSceneCfg):
     # ground terrain
     terrain = TerrainImporterCfg(
         prim_path="/World/ground",
-        terrain_type="generator",
-        terrain_generator=TerrainGeneratorCfg(
-            size=(8.0, 8.0),          # meters
-            num_rows=16,
-            num_cols=16,
-            horizontal_scale=0.20,    # smaller => finer bumps
-            vertical_scale=0.005,     # larger => taller bumps
-            difficulty_range=(0.0, 1.0),
-            sub_terrains={
-                "rough": hf.HfRandomUniformTerrainCfg(
-                    noise_range=(0.0, 0.03),
-                    noise_step=0.005,
-                    downsampled_scale=0.2,
-                )
-            },
-        ),
+        terrain_type="plane",
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
@@ -71,22 +56,11 @@ class MySceneCfg(InteractiveSceneCfg):
             static_friction=1.0,
             dynamic_friction=1.0,
         ),
+        visual_material=sim_utils.MdlFileCfg(
+            mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
+            project_uvw=True,
+        ),
     )
-    #terrain = TerrainImporterCfg(
-    #    prim_path="/World/ground",
-    #    terrain_type="plane",
-    #    collision_group=-1,
-    #    physics_material=sim_utils.RigidBodyMaterialCfg(
-    #        friction_combine_mode="multiply",
-    #        restitution_combine_mode="multiply",
-    #        static_friction=1.0,
-    #        dynamic_friction=1.0,
-    #    ),
-    #    visual_material=sim_utils.MdlFileCfg(
-    #        mdl_path="{NVIDIA_NUCLEUS_DIR}/Materials/Base/Architecture/Shingles_01.mdl",
-    #        project_uvw=True,
-    #    ),
-    #)
     # robots
     robot: ArticulationCfg = MISSING
     # lights
@@ -161,7 +135,7 @@ class ObservationsCfg:
         joint_pos_hi = ObsTerm(
             func=mdp.joint_pos_rel,
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
-            noise=Unoise(n_min=-0.1, n_max=0.1),
+            noise=Unoise(n_min=-0.02, n_max=0.02),
         )
         joint_pos_lo = ObsTerm(
             func=mdp.joint_pos_rel,
@@ -172,7 +146,7 @@ class ObservationsCfg:
         joint_vel_hi = ObsTerm(
             func=mdp.joint_vel_rel,
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
-            noise=Unoise(n_min=-1.5, n_max=1.5),
+            noise=Unoise(n_min=-1.0, n_max=1.0),
         )
         joint_vel_lo = ObsTerm(
             func=mdp.joint_vel_rel,
@@ -276,7 +250,19 @@ class EventCfg:
         mode="startup",   # recommended
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"]),
-            "stiffness_distribution_params": (0.0, 0.0),
+            "stiffness_distribution_params": (-1.5, 1.5),
+            "damping_distribution_params": (-0.2, 1.5),
+            "operation": "add",
+            "distribution": "uniform",
+        },
+    )
+
+    randomize_ankle_rest = EventTerm(
+        func=mdp.randomize_actuator_gains,
+        mode="startup",   # recommended
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"]),
+            "stiffness_distribution_params": (-1.0, 1.0),
             "damping_distribution_params": (-0.3, 0.3),
             "operation": "add",
             "distribution": "uniform",
