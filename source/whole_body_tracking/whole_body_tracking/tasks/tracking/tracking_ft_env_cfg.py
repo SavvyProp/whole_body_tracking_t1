@@ -309,7 +309,7 @@ class EventCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"]),
             "stiffness_distribution_params": (-1.0, 1.0),
-            "damping_distribution_params": (-0.3, 0.3),
+            "damping_distribution_params": (-0.3, 0.3), 
             "operation": "add",
             "distribution": "uniform",
         },
