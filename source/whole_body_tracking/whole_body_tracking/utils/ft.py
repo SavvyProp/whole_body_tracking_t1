@@ -530,18 +530,12 @@ def ftf_step(com_pos, com_vel,
 
     # Scale per-effector 6D wrench blocks by contact state.
     # contact_state expected (N, EEF_NUM) or (EEF_NUM,)
-    cs = contact_state
-    if cs.dim() == 1:
-        cs = cs.unsqueeze(0)
-    cs = cs.to(device=f.device, dtype=f.dtype)
-    if cs.shape[0] == 1 and f.shape[0] > 1:
-        cs = cs.expand(f.shape[0], -1)
-
+    
     # f: (N, 6*EEF_NUM, 35) -> (N, EEF_NUM, 6, 35) for correct broadcasting
     N = f.shape[0]
-    f = f.view(N, EEF_NUM, 6, *f.shape[2:])
-    f = f * cs[:, :, None, None]
-    f = f.view(N, EEF_NUM * 6, *f.shape[3:])
+    f = f.view(N, EEF_NUM, 6)
+    f = f * contact_state[:, :, None]
+    f = f.view(N, EEF_NUM * 6)
 
     candidate_tau = -jacs_0[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
@@ -614,17 +608,10 @@ def ftft_step(com_pos, com_vel,
 
     # Scale per-effector 6D wrench blocks by contact state.
     # contact_state expected (N, EEF_NUM) or (EEF_NUM,)
-    cs = contact_state
-    if cs.dim() == 1:
-        cs = cs.unsqueeze(0)
-    cs = cs.to(device=f.device, dtype=f.dtype)
-    if cs.shape[0] == 1 and f.shape[0] > 1:
-        cs = cs.expand(f.shape[0], -1)
-
     N = f.shape[0]
-    f = f.view(N, EEF_NUM, 6, *f.shape[2:])
-    f = f * cs[:, :, None, None]
-    f = f.view(N, EEF_NUM * 6, *f.shape[3:])
+    f = f.view(N, EEF_NUM, 6)
+    f = f * contact_state[:, :, None]
+    f = f.view(N, EEF_NUM * 6)
 
     candidate_tau = -jacs_0[..., :, 6:].transpose(-1, -2) @ f[..., None]
     candidate_tau = candidate_tau.squeeze(-1)
