@@ -192,7 +192,7 @@ class ObservationsCfg:
         joint_vel_hi = ObsTerm(
             func=mdp.joint_vel_rel,
             params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
-            noise=Unoise(n_min=-1.0, n_max=1.0),
+            noise=Unoise(n_min=-0.5, n_max=0.5),
         )
         joint_vel_lo = ObsTerm(
             func=mdp.joint_vel_rel,
@@ -281,11 +281,11 @@ class EventCfg:
         params={
             "lcc_range":
             {
-                "vel_range": (-0.20, 0.20),
-                "angvel_range": (-0.40, 0.40),
-                "mass_fac_range": (0.95, 1.05),
-                "i_fac_range": (0.95, 1.05),
-                "jac_fac_range": (0.95, 1.05),
+                "vel_range": (-0.10, 0.10),
+                "angvel_range": (-0.20, 0.20),
+                "mass_fac_range": (0.98, 1.02),
+                "i_fac_range": (0.98, 1.02),
+                "jac_fac_range": (0.98, 1.02),
                 "pos_range": (-0.02, 0.02),
             }
         },
@@ -296,7 +296,7 @@ class EventCfg:
         mode="startup",   # recommended
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"]),
-            "stiffness_distribution_params": (-1.5, 1.5),
+            "stiffness_distribution_params": (-2.0, 2.0),
             "damping_distribution_params": (-0.2, 1.5),
             "operation": "add",
             "distribution": "uniform",
@@ -308,8 +308,8 @@ class EventCfg:
         mode="startup",   # recommended
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"]),
-            "stiffness_distribution_params": (-1.0, 1.0),
-            "damping_distribution_params": (-0.3, 0.3), 
+            "stiffness_distribution_params": (-2.0, 2.0),
+            "damping_distribution_params": (-0.6, 0.6), 
             "operation": "add",
             "distribution": "uniform",
         },
