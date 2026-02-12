@@ -517,7 +517,7 @@ class TrackingFTEnvCfg(ManagerBasedRLEnvCfg):
 
     # Scene settings
     #scene: RoughSceneCfg = RoughSceneCfg(num_envs=4096, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=6503, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
@@ -550,7 +550,7 @@ class TrackingFTEnvEvalCfg(ManagerBasedRLEnvCfg):
 
     # Scene settings
     #scene: RoughSceneCfg = RoughSceneCfg(num_envs=4096, env_spacing=2.5)
-    scene: MySceneCfg = MySceneCfg(num_envs=4096, env_spacing=2.5)
+    scene: MySceneCfg = MySceneCfg(num_envs=6503, env_spacing=2.5)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
