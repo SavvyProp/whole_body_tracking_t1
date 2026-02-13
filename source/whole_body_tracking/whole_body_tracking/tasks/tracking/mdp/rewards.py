@@ -93,6 +93,22 @@ def contact_state(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.T
     lse = torch.sum(torch.square(contact_mask.float() - pred_contact_mask), dim=-1)
     return lse
 
+def left_foot_right_foot_collision(
+    env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg, threshold: float = 1.0
+) -> torch.Tensor:
+    """Penalize left-foot collisions with the right foot using filtered contact forces."""
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    force_matrix_history = contact_sensor.data.force_matrix_w_history
+    if force_matrix_history is None:
+        return torch.zeros(
+            contact_sensor.data.net_forces_w.shape[0],
+            device=contact_sensor.data.net_forces_w.device,
+        )
+
+    max_force = torch.max(torch.norm(force_matrix_history, dim=-1), dim=1)[0]
+    is_collision = (max_force > threshold).reshape(max_force.shape[0], -1)
+    return is_collision.sum(dim=1).float()
+
 def centroid_velocity(env: ManagerBasedRLEnv):
     command_name = "motion"
     command: MotionCommand = env.command_manager.get_term(command_name)

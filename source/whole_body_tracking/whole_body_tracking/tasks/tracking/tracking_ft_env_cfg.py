@@ -75,6 +75,13 @@ class MySceneCfg(InteractiveSceneCfg):
     contact_forces = ContactSensorCfg(
         prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True, force_threshold=10.0, debug_vis=True
     )
+    left_foot_right_foot_contact = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/left_foot_link",
+        filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/right_foot_link"],
+        history_length=3,
+        force_threshold=10.0,
+        debug_vis=False,
+    )
 
 @configclass
 class RoughSceneCfg(InteractiveSceneCfg):
@@ -120,6 +127,13 @@ class RoughSceneCfg(InteractiveSceneCfg):
     )
     contact_forces = ContactSensorCfg(
         prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True, force_threshold=10.0, debug_vis=True
+    )
+    left_foot_right_foot_contact = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/left_foot_link",
+        filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/right_foot_link"],
+        history_length=3,
+        force_threshold=10.0,
+        debug_vis=False,
     )
 
 
@@ -296,8 +310,8 @@ class EventCfg:
         mode="startup",   # recommended
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"]),
-            "stiffness_distribution_params": (-2.0, 2.0),
-            "damping_distribution_params": (-0.2, 1.5),
+            "stiffness_distribution_params": (-1.5, 1.5),
+            "damping_distribution_params": (-0.2, 1.0),
             "operation": "add",
             "distribution": "uniform",
         },
@@ -308,7 +322,7 @@ class EventCfg:
         mode="startup",   # recommended
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"]),
-            "stiffness_distribution_params": (-2.0, 2.0),
+            "stiffness_distribution_params": (-1.5, 1.5),
             "damping_distribution_params": (-0.6, 0.6), 
             "operation": "add",
             "distribution": "uniform",
@@ -394,7 +408,7 @@ class RewardsCfg:
     )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-0.1,
+        weight=-0.5,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
@@ -402,6 +416,14 @@ class RewardsCfg:
                     r"^(?!left_foot_link$)(?!right_foot_link$)(?!left_hand_link$)(?!right_hand_link$).+$"
                 ],
             ),
+            "threshold": 1.0,
+        },
+    )
+    left_foot_right_foot_collision = RewTerm(
+        func=mdp.left_foot_right_foot_collision,
+        weight=-0.20,
+        params={
+            "sensor_cfg": SceneEntityCfg("left_foot_right_foot_contact"),
             "threshold": 1.0,
         },
     )

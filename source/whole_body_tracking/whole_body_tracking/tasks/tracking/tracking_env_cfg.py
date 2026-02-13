@@ -75,6 +75,14 @@ class MySceneCfg(InteractiveSceneCfg):
         prim_path="{ENV_REGEX_NS}/Robot/.*", history_length=3, track_air_time=True, force_threshold=10.0, debug_vis=True
     )
 
+    left_foot_right_foot_contact = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/left_foot_link",
+        filter_prim_paths_expr=["{ENV_REGEX_NS}/Robot/right_foot_link"],
+        history_length=3,
+        force_threshold=10.0,
+        debug_vis=False,
+    )
+
 
 ##
 # MDP settings
@@ -116,7 +124,7 @@ class ObservationsCfg:
     @configclass
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
-        #history_length = 6
+        history_length = 4
         # observation terms (order preserved)
         command = ObsTerm(func=mdp.generated_commands, params={"command_name": "motion"})
         #motion_anchor_pos_b = ObsTerm(
@@ -127,10 +135,28 @@ class ObservationsCfg:
         #)
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.5, n_max=0.5))
         base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
-        joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel = ObsTerm(func=mdp.joint_vel_rel, noise=Unoise(n_min=-1.0, n_max=1.0))
+        joint_pos_hi = ObsTerm(
+            func=mdp.joint_pos_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
+            noise=Unoise(n_min=-0.02, n_max=0.02),
+        )
+        joint_pos_lo = ObsTerm(
+            func=mdp.joint_pos_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"])},
+            noise=Unoise(n_min=-0.01, n_max=0.01),
+        )
+        #joint_pos = ObsTerm(func=mdp.joint_pos_rel, noise=Unoise(n_min=-0.01, n_max=0.01))
+        joint_vel_hi = ObsTerm(
+            func=mdp.joint_vel_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"])},
+            noise=Unoise(n_min=-0.5, n_max=0.5),
+        )
+        joint_vel_lo = ObsTerm(
+            func=mdp.joint_vel_rel,
+            params={"asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"])},
+            noise=Unoise(n_min=-0.5, n_max=0.5),
+        )
         actions = ObsTerm(func=mdp.last_action)
-
         def __post_init__(self):
             self.enable_corruption = True
             self.concatenate_terms = True
@@ -194,8 +220,20 @@ class EventCfg:
         mode="startup",   # recommended
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"]),
-            "stiffness_distribution_params": (0.0, 0.0),
-            "damping_distribution_params": (-0.3, 0.3),
+            "stiffness_distribution_params": (-1.5, 1.5),
+            "damping_distribution_params": (-0.2, 1.0),
+            "operation": "add",
+            "distribution": "uniform",
+        },
+    )
+
+    randomize_ankle_rest = EventTerm(
+        func=mdp.randomize_actuator_gains,
+        mode="startup",   # recommended
+        params={
+            "asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"]),
+            "stiffness_distribution_params": (-1.5, 1.5),
+            "damping_distribution_params": (-0.6, 0.6), 
             "operation": "add",
             "distribution": "uniform",
         },
@@ -277,7 +315,7 @@ class RewardsCfg:
     motion_body_ang_vel = RewTerm(
         func=mdp.motion_global_body_angular_velocity_error_exp,
         weight=1.0,
-        params={"command_name": "motion", "std": 3.14/2.0},
+        params={"command_name": "motion", "std": 3.14/1.5},
     )
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-1e-1)
     joint_limit = RewTerm(
@@ -295,6 +333,14 @@ class RewardsCfg:
                     r"^(?!left_ankle_roll_link$)(?!right_ankle_roll_link$)(?!left_wrist_yaw_link$)(?!right_wrist_yaw_link$).+$"
                 ],
             ),
+            "threshold": 1.0,
+        },
+    )
+    left_foot_right_foot_collision = RewTerm(
+        func=mdp.left_foot_right_foot_collision,
+        weight=-0.20,
+        params={
+            "sensor_cfg": SceneEntityCfg("left_foot_right_foot_contact"),
             "threshold": 1.0,
         },
     )
