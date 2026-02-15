@@ -597,7 +597,7 @@ def ftft_step(com_pos, com_vel,
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
     qp_q_ = qp_q_ * weights[0]
     
-    jt_q_big, jt_q_small = joint_torque_q(jacs, comp_dict["tau"], comp_dict["torque_weight"])
+    jt_q_big, jt_q_small = joint_torque_q(jacs, comp_dict["des_tau"], comp_dict["torque_weight"])
     jt_q_big = jt_q_big * weights[1]
 
     qp_q = qp_q_ + jt_q_big

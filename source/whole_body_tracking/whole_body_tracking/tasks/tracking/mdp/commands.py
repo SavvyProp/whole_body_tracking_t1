@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 # W2K 0.02
 # CMU_41_02 0.04
-# W2K 0.01
+# W2K 0.007
 # Jumps 0.06
 THRESH = 0.06
 
