@@ -85,7 +85,7 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits)
 
-    d_gain_lin = 10.0
+    d_gain_lin = 15.0
     d_gain_angvel = 10.0
 
     return {
@@ -525,8 +525,8 @@ def ftf_step(com_pos, com_vel,
     w = contact_state * 20.0 - 10.0
     qp_q = f_mag_q(w)
     qp_c = torch.zeros((com_pos.shape[0], qp_q.shape[-1]), device=com_pos.device, dtype=com_pos.dtype)
-
-    f = schur_solve(qp_q, qp_c, a, g)
+    cons_lhs, cons_rhs = centroidal_qacc_cons(a, g, torch.cat([com_acc, ang_acc], dim=-1))
+    f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
     # Scale per-effector 6D wrench blocks by contact state.
     # contact_state expected (N, EEF_NUM) or (EEF_NUM,)
@@ -603,8 +603,8 @@ def ftft_step(com_pos, com_vel,
     qp_q = qp_q_ + jt_q_big
     qp_c = jt_q_small * weights[1]
     #qp_c = torch.zeros((com_pos.shape[0], qp_q.shape[-1]), device=com_pos.device, dtype=com_pos.dtype)
-
-    f = schur_solve(qp_q, qp_c, a, g)
+    cons_lhs, cons_rhs = centroidal_qacc_cons(a, g, torch.cat([com_acc, ang_acc], dim=-1))
+    f = schur_solve(qp_q, qp_c, cons_lhs, cons_rhs)
 
     # Scale per-effector 6D wrench blocks by contact state.
     # contact_state expected (N, EEF_NUM) or (EEF_NUM,)

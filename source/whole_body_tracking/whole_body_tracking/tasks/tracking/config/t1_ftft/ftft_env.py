@@ -286,7 +286,7 @@ class FTFEnv(ManagerBasedRLEnv):
         print("[INFO] Recorder Manager: ", self.recorder_manager)
         # -- action manager
         # -- observation manager
-        self.action_manager = FTFActionManager(self.cfg.actions, self)
+        self.action_manager = FTFTActionManager(self.cfg.actions, self)
 
         self.observation_manager = ObservationManager(self.cfg.observations, self)
         print("[INFO] Observation Manager:", self.observation_manager)
