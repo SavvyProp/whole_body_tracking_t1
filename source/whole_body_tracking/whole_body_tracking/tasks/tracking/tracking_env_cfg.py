@@ -109,6 +109,26 @@ class CommandsCfg:
         joint_position_range=(-0.1, 0.1),
     )
 
+@configclass
+class CommandsEvalCfg:
+    """Command specifications for the MDP."""
+
+    motion = mdp.MotionCommandCfg(
+        asset_name="robot",
+        resampling_time_range=(1.0e9, 1.0e9),
+        debug_vis=True,
+        pose_range={
+            "x": (-0.05, 0.05),
+            "y": (-0.05, 0.05),
+            "z": (-0.01, 0.01),
+            "roll": (-0.1, 0.1),
+            "pitch": (-0.1, 0.1),
+            "yaw": (-0.2, 0.2),
+        },
+        velocity_range=VELOCITY_RANGE,
+        joint_position_range=(-0.001, 0.001),
+    )
+
 
 @configclass
 class ActionsCfg:
@@ -431,7 +451,7 @@ class TrackingEnvEvalCfg(ManagerBasedRLEnvCfg):
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg()
-    commands: CommandsCfg = CommandsCfg()
+    commands: CommandsEvalCfg = CommandsEvalCfg()
     # MDP settings
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsEvalCfg = TerminationsEvalCfg()
