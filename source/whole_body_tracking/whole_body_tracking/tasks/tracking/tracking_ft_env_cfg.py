@@ -265,8 +265,8 @@ class EventCfg:
         mode="startup",
         params={
             "asset_cfg": SceneEntityCfg("robot", body_names=".*"),
-            "static_friction_range": (0.3, 1.2),
-            "dynamic_friction_range": (0.3, 1.2),
+            "static_friction_range": (0.3, 0.99),
+            "dynamic_friction_range": (0.3, 0.99),
             "restitution_range": (0.0, 0.5),
             "num_buckets": 64,
         },
@@ -314,7 +314,7 @@ class EventCfg:
         params={
             "lcc_range":
             {
-                "vel_range": (-0.10, 0.10),
+                "vel_range": (-0.20, 0.20),
                 "angvel_range": (-0.20, 0.20),
                 "mass_fac_range": (0.98, 1.02),
                 "i_fac_range": (0.98, 1.02),
@@ -330,7 +330,7 @@ class EventCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[".*_Ankle_Pitch", ".*_Ankle_Roll"]),
             "stiffness_distribution_params": (-2.0, 2.0),
-            "damping_distribution_params": (-0.2, 2.0),
+            "damping_distribution_params": (-0.5, 2.0),
             "operation": "add",
             "distribution": "uniform",
         },
@@ -342,7 +342,7 @@ class EventCfg:
         params={
             "asset_cfg": SceneEntityCfg("robot", joint_names=[r"^(?!.*_Ankle_(Pitch|Roll)$).*$"]),
             "stiffness_distribution_params": (-2.0, 2.0),
-            "damping_distribution_params": (-0.3, 0.6), 
+            "damping_distribution_params": (-0.5, 1.5), 
             "operation": "add",
             "distribution": "uniform",
         },

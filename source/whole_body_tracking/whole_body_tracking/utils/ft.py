@@ -41,7 +41,7 @@ TORQUE_LIMITS_COST = torch.tensor([
     18, 18, 
     60, 60, 
     18, 18, 
-    12, 12, 
+    10, 10, 
     18, 18, 
     7.5, 7.5
 ], dtype=torch.float32)
@@ -97,15 +97,16 @@ def ctrl2components(act):
 
     # Move torque limits onto the same device/dtype as the policy output.
     torque_limits = TORQUE_LIMITS.to(device=torque_logit.device, dtype=torque_logit.dtype)
+    torque_limits_cost = TORQUE_LIMITS_COST.to(device=torque_logit.device, dtype=torque_logit.dtype)
 
     tau_naive = torque_limits[None, :] * torque_logit
     tau = tau_naive
 
     # Create torque weights on the same device/dtype as runtime tensors.
-    torque_weight = torch.square(1.0 / torque_limits)
+    torque_weight = torch.square(1.0 / torque_limits_cost)
 
     d_gain_lin = 5.0
-    d_gain_angvel = 10.0
+    d_gain_angvel = 15.0
 
     return {
         "des_pos": des_pos,
@@ -222,7 +223,7 @@ def f_mag_q(w: torch.Tensor) -> torch.Tensor:
     # Same scaling as your original
     logits    = -torch.clip(w, min=-10.0, max=10.0)  # (N, E)
     scale_lin = torch.exp(logits)                  # (N, E)
-    scale_ang = scale_lin * 10.0                   # (N, E)
+    scale_ang = scale_lin * 20.0                   # (N, E)
 
     # Build per-effector 6-tuple = [lin, lin, lin, ang, ang, ang]
     # Shape: (N, E, 6) so each effector's 6 entries stay contiguous
