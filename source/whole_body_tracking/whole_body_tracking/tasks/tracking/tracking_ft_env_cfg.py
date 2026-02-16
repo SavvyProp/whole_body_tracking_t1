@@ -448,7 +448,7 @@ class RewardsCfg:
     )
     contact_ft = RewTerm(
         func=mdp.contact_state,
-        weight=-0.25,
+        weight=-0.50,
         params={
             "sensor_cfg": SceneEntityCfg(
                 "contact_forces",
