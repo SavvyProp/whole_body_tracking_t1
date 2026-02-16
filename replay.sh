@@ -1,1 +1,1 @@
-python scripts/replay_npz.py --registry_name=ludwigtaycheeying-purdue-university-org/wandb-registry-motions/lafan_wf
+python scripts/replay_npz.py --registry_name=ludwigtaycheeying-purdue-university-org/wandb-registry-motions/lafan_balance_trans
