@@ -41,9 +41,9 @@ TORQUE_LIMITS_COST = torch.tensor([
     18, 18, 
     60, 60, 
     18, 18, 
-    10, 10, 
+    24, 24, 
     18, 18, 
-    7.5, 7.5
+    15, 15
 ], dtype=torch.float32)
 
 CTRL_NUM = 29
@@ -93,7 +93,8 @@ def ctrl2components(act):
 
     w = logits["w"]
 
-    torque_logit = torch.tanh(logits["torque"] * 0.5)
+    #torque_logit = torch.tanh(logits["torque"] * 0.5)
+    torque_logit = logits["torque"] * 0.1
 
     # Move torque limits onto the same device/dtype as the policy output.
     torque_limits = TORQUE_LIMITS.to(device=torque_logit.device, dtype=torque_logit.dtype)
@@ -105,8 +106,8 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits_cost)
 
-    d_gain_lin = 5.0
-    d_gain_angvel = 10.0
+    d_gain_lin = 15.0
+    d_gain_angvel = 15.0
 
     return {
         "des_pos": des_pos,
@@ -600,7 +601,7 @@ def ftft_step(com_pos, com_vel,
     mass = MASS * lcc_rand["mass_fac"]
     i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
 
-    weights = torch.tensor([1e-3, 1e1], device=eefpos.device, dtype=eefpos.dtype)
+    weights = torch.tensor([1e-3, 1e2], device=eefpos.device, dtype=eefpos.dtype)
     a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b, lcc_rand["grav_vec"])
 
     w = contact_state * 20.0 - 10.0
