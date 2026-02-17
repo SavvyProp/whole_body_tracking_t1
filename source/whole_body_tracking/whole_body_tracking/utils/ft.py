@@ -406,7 +406,7 @@ def ft_ref(
     ], dim = 1)
 
     # Ensure weights tensor matches eefpos device/dtype.
-    weights = torch.tensor([1e-3, 1e1], device=eefpos.device, dtype=eefpos.dtype)
+    weights = torch.tensor([1e-3, 1e2], device=eefpos.device, dtype=eefpos.dtype)
     a, g = make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b, grav_vec)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
