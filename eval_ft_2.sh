@@ -1,1 +1,1 @@
-python scripts/rsl_rl/tracking_play.py --task=Tracking-FT-T1-Eval-v0 --num_envs=16 --wandb_path=ludwigtaycheeying-purdue-university/t1_lcc_sim2real/j0y4brpd
+python scripts/rsl_rl/tracking_play.py --task=Tracking-FT-T1-Eval-v0 --num_envs=256 --wandb_path=ludwigtaycheeying-purdue-university/t1_lcc_29/6tlc06ec
