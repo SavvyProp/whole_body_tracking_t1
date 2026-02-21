@@ -184,12 +184,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     ref_angvel = np.zeros((duration, env_cfg.scene.num_envs, 5, 3))
     sim_ori = np.zeros((duration, env_cfg.scene.num_envs, 4))
 
-    sim_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 29))
-    sim_joint_vel = np.zeros((duration, env_cfg.scene.num_envs, 29))
-    sim_joint_torque = np.zeros((duration, env_cfg.scene.num_envs, 29))
-    sim_ff_torque = np.zeros((duration, env_cfg.scene.num_envs, 29))
-    sim_joint_torque_nle = np.zeros((duration, env_cfg.scene.num_envs, 29))
-    sim_des_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 29))
+    sim_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 23))
+    sim_joint_vel = np.zeros((duration, env_cfg.scene.num_envs, 23))
+    sim_joint_torque = np.zeros((duration, env_cfg.scene.num_envs, 23))
+    sim_ff_torque = np.zeros((duration, env_cfg.scene.num_envs, 23))
+    sim_joint_torque_nle = np.zeros((duration, env_cfg.scene.num_envs, 23))
+    sim_des_joint_pos = np.zeros((duration, env_cfg.scene.num_envs, 23))
 
     for c in range(duration):
         # run everything in inference mode

@@ -2,8 +2,8 @@ import torch
 from isaaclab.utils.math import quat_apply, matrix_from_quat
 from torch._dynamo import disable
 
-bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'AL4', 'AR4', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'AL5', 'AR5', 'Shank_Left', 'Shank_Right', 'AL6', 'AR6', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_hand_link', 'right_hand_link', 'left_foot_link', 'right_foot_link']
-joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 'Head_pitch', 'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 'Left_Hip_Pitch', 'Right_Hip_Pitch', 'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 'Left_Hip_Roll', 'Right_Hip_Roll', 'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 'Left_Hip_Yaw', 'Right_Hip_Yaw', 'Left_Wrist_Pitch', 'Right_Wrist_Pitch', 'Left_Knee_Pitch', 'Right_Knee_Pitch', 'Left_Wrist_Yaw', 'Right_Wrist_Yaw', 'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 'Left_Hand_Roll', 'Right_Hand_Roll', 'Left_Ankle_Roll', 'Right_Ankle_Roll']
+bodies = ['Trunk', 'H1', 'AL1', 'AR1', 'Waist', 'H2', 'AL2', 'AR2', 'Hip_Pitch_Left', 'Hip_Pitch_Right', 'AL3', 'AR3', 'Hip_Roll_Left', 'Hip_Roll_Right', 'left_hand_link', 'right_hand_link', 'Hip_Yaw_Left', 'Hip_Yaw_Right', 'Shank_Left', 'Shank_Right', 'Ankle_Cross_Left', 'Ankle_Cross_Right', 'left_foot_link', 'right_foot_link']
+joints = ['AAHead_yaw', 'Left_Shoulder_Pitch', 'Right_Shoulder_Pitch', 'Waist', 'Head_pitch', 'Left_Shoulder_Roll', 'Right_Shoulder_Roll', 'Left_Hip_Pitch', 'Right_Hip_Pitch', 'Left_Elbow_Pitch', 'Right_Elbow_Pitch', 'Left_Hip_Roll', 'Right_Hip_Roll', 'Left_Elbow_Yaw', 'Right_Elbow_Yaw', 'Left_Hip_Yaw', 'Right_Hip_Yaw', 'Left_Knee_Pitch', 'Right_Knee_Pitch', 'Left_Ankle_Pitch', 'Right_Ankle_Pitch', 'Left_Ankle_Roll', 'Right_Ankle_Roll']
 
 ANKLE_NAMES = ["Left_Ankle_Pitch", "Right_Ankle_Pitch",
                "Left_Ankle_Roll", "Right_Ankle_Roll"]
@@ -19,13 +19,10 @@ TORQUE_LIMITS = torch.tensor([
     25, 25, 
     18, 18, 
     25, 25, 
-    18, 18, 
     60, 60, 
     18, 18, 
-    24, 24, 
-    18, 18, 
     15, 15
-], dtype=torch.float32)
+], device = "cuda")
 
 TORQUE_LIMITS_COST = torch.tensor([
     7, 
@@ -38,15 +35,12 @@ TORQUE_LIMITS_COST = torch.tensor([
     25, 25, 
     18, 18, 
     25, 25, 
-    18, 18, 
     60, 60, 
-    18, 18, 
-    24, 24, 
-    18, 18, 
-    15, 15
-], dtype=torch.float32)
+    10, 10, 
+    7.5, 7.5
+], device = "cuda")
 
-CTRL_NUM = 29
+CTRL_NUM = 23
 MASS = 34.634069
 #SPHERE_RAD = 0.30
 #SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
@@ -406,7 +400,7 @@ def ft_ref(
     ], dim = 1)
 
     # Ensure weights tensor matches eefpos device/dtype.
-    weights = torch.tensor([1e-3, 1e2], device=eefpos.device, dtype=eefpos.dtype)
+    weights = torch.tensor([1e-3, 4e2], device=eefpos.device, dtype=eefpos.dtype)
     a, g = make_centroidal_ag(eefpos, com_pos, base_quat, mass, i_b, grav_vec)
 
     qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
@@ -506,132 +500,6 @@ def step(com_pos, com_vel,
     info["com_angvel"] = global_angvel
     info["com_acc"] = com_acc
     info["com_angacc"] = ang_acc
-    return comp_dict["des_pos"], tau, info
-
-def ftf_step(com_pos, com_vel, 
-             jacs, eefpos,
-             base_quat, base_angvel,
-             action, contact_state, nle, lcc_rand):
-    # Variant of ft step with modified action
-    # fixed contact state with weight of 2^10 for contacting and 2^-10 for non contacting
-    # no reference torque
-    comp_dict = ctrl2components_ftf(action)
-    com_vel_ = com_vel + lcc_rand["com_vel"]
-    base_angvel_ = base_angvel + lcc_rand["com_angvel"]
-    com_acc, ang_acc, global_vel, global_angvel = highlvlPD(
-        base_quat, base_angvel_,
-        comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
-        comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
-        com_vel_
-    )
-
-    idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
-    selected_jacs = jacs.index_select(1, idx)                 # (N, EEF_NUM, 6, D)
-    jacs_ = selected_jacs.reshape(selected_jacs.size(0), -1, selected_jacs.size(-1))  # (N, 6*EEF_NUM, D)
-    eefpos_ = eefpos.index_select(1, idx)                 # (N, EEF_NUM, 3)
-
-    # Add offsets to pos
-    eefpos_offset = lcc_rand["pos"][:, 1:, :]
-    eefpos_0 = eefpos_ + eefpos_offset
-    com_pos_ = com_pos + lcc_rand["pos"][:, 0, :]
-
-    # Modify jacs
-    jacs_0 = jacs_ * lcc_rand["jac_fac"]
-
-    # Modify mass
-    mass = MASS * lcc_rand["mass_fac"]
-    i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
-
-    a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b, lcc_rand["grav_vec"])
-    w = contact_state * 20.0 - 10.0
-    qp_q = f_mag_q(w)
-    qp_c = torch.zeros((com_pos.shape[0], qp_q.shape[-1]), device=com_pos.device, dtype=com_pos.dtype)
-
-    f = schur_solve(qp_q, qp_c, a, g)
-    candidate_tau = -jacs_0[..., :, 6:].transpose(-1, -2) @ f[..., None]
-    candidate_tau = candidate_tau.squeeze(-1)
-    candidate_tau = candidate_tau + nle
-
-    torque_limits = TORQUE_LIMITS.to(device=candidate_tau.device, dtype=candidate_tau.dtype)
-    tau = torch.clamp(candidate_tau, min=-torque_limits[None, :], max=torque_limits[None, :])
-
-    info = {
-        "f": f,
-        "candidate_tau": candidate_tau,
-        "w": w,
-        "com_vel": global_vel,
-        "com_angvel": global_angvel,
-        "com_acc": com_acc,
-        "com_angacc": ang_acc,
-    }
-    return comp_dict["des_pos"], tau, info
-
-
-def ftft_step(com_pos, com_vel, 
-             jacs, eefpos,
-             base_quat, base_angvel,
-             action, contact_state, nle, lcc_rand):
-    # Variant of ft step with modified action
-    # fixed contact state with weight of 2^10 for contacting and 2^-10 for non contacting
-    # no reference torque
-    comp_dict = ctrl2components_ftft(action)
-    com_vel_ = com_vel + lcc_rand["com_vel"]
-    base_angvel_ = base_angvel + lcc_rand["com_angvel"]
-    com_acc, ang_acc, global_vel, global_angvel = highlvlPD(
-        base_quat, base_angvel_,
-        comp_dict["d_gain_lin"], comp_dict["d_gain_angvel"],
-        comp_dict["des_com_vel"], comp_dict["des_com_angvel"],
-        com_vel_
-    )
-
-    idx = torch.as_tensor(EEF_IDS, device=jacs.device, dtype=torch.long)
-    selected_jacs = jacs.index_select(1, idx)                 # (N, EEF_NUM, 6, D)
-    jacs_ = selected_jacs.reshape(selected_jacs.size(0), -1, selected_jacs.size(-1))  # (N, 6*EEF_NUM, D)
-    eefpos_ = eefpos.index_select(1, idx)                 # (N, EEF_NUM, 3)
-
-    # Add offsets to pos
-    eefpos_offset = lcc_rand["pos"][:, 1:, :]
-    eefpos_0 = eefpos_ + eefpos_offset
-    com_pos_ = com_pos + lcc_rand["pos"][:, 0, :]
-
-    # Modify jacs
-    jacs_0 = jacs_ * lcc_rand["jac_fac"]
-
-    # Modify mass
-    mass = MASS * lcc_rand["mass_fac"]
-    i_b = ANGULAR_INERTIA.to(device = com_pos.device).view(1, 3, 3) * lcc_rand["i_fac"] 
-
-    weights = torch.tensor([1e-3, 1e2], device=eefpos.device, dtype=eefpos.dtype)
-    a, g = make_centroidal_ag(eefpos_0, com_pos_, base_quat, mass, i_b, lcc_rand["grav_vec"])
-
-    w = contact_state * 20.0 - 10.0
-    qp_q_ = f_mag_q(w)  # (N, 6*EEF_NUM, 6*EEF_NUM)
-    qp_q_ = qp_q_ * weights[0]
-    
-    jt_q_big, jt_q_small = joint_torque_q(jacs, comp_dict["tau"], comp_dict["torque_weight"])
-    jt_q_big = jt_q_big * weights[1]
-
-    qp_q = qp_q_ + jt_q_big
-    qp_c = jt_q_small * weights[1]
-    #qp_c = torch.zeros((com_pos.shape[0], qp_q.shape[-1]), device=com_pos.device, dtype=com_pos.dtype)
-
-    f = schur_solve(qp_q, qp_c, a, g)
-    candidate_tau = -jacs_0[..., :, 6:].transpose(-1, -2) @ f[..., None]
-    candidate_tau = candidate_tau.squeeze(-1)
-    candidate_tau = candidate_tau + nle
-
-    torque_limits = TORQUE_LIMITS.to(device=candidate_tau.device, dtype=candidate_tau.dtype)
-    tau = torch.clamp(candidate_tau, min=-torque_limits[None, :], max=torque_limits[None, :])
-
-    info = {
-        "f": f,
-        "candidate_tau": candidate_tau,
-        "w": w,
-        "com_vel": global_vel,
-        "com_angvel": global_angvel,
-        "com_acc": com_acc,
-        "com_angacc": ang_acc,
-    }
     return comp_dict["des_pos"], tau, info
 
 try:

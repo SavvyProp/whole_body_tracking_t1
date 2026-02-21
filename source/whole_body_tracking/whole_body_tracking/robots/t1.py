@@ -26,7 +26,7 @@ DAMPING_HIGH = 2.0 * DAMPING_RATIO * ARMATURE_HIGH * NATURAL_FREQ
 
 BOOSTER_T1_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ASSET_DIR}/booster/T1_29dof/T1_29dof.usd",
+        usd_path=f"{ASSET_DIR}/booster/t1/t1.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -126,9 +126,6 @@ BOOSTER_T1_CFG = ArticulationCfg(
                 ".*_Shoulder_Roll",
                 ".*_Elbow_Pitch",
                 ".*_Elbow_Yaw",
-                ".*_Wrist_Pitch",
-                ".*_Wrist_Yaw",
-                ".*_Hand_Roll",
             ],
             effort_limit_sim=18.0,
             velocity_limit_sim=18.8,
@@ -151,7 +148,7 @@ FT_FAC = 0.75
 
 BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path=f"{ASSET_DIR}/booster/T1_29dof/T1_29dof.usd",
+        usd_path=f"{ASSET_DIR}/booster/t1/t1.usd",
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             disable_gravity=False,
@@ -251,9 +248,6 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
                 ".*_Shoulder_Roll",
                 ".*_Elbow_Pitch",
                 ".*_Elbow_Yaw",
-                ".*_Wrist_Pitch",
-                ".*_Wrist_Yaw",
-                ".*_Hand_Roll",
             ],
             effort_limit_sim=18.0,
             velocity_limit_sim=18.8,

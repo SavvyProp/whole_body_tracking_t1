@@ -338,20 +338,16 @@ def main():
         sim,
         scene,
         joint_names = [
+    "AAHead_yaw",
+    "Head_pitch",
     "Left_Shoulder_Pitch",  # Motor ID 0
     "Left_Shoulder_Roll",   # Motor ID 1
     "Left_Elbow_Pitch",     # Motor ID 2
     "Left_Elbow_Yaw",       # Motor ID 3
-    "Left_Wrist_Pitch",     # Motor ID 4
-    "Left_Wrist_Yaw",       # Motor ID 5
-    "Left_Hand_Roll",       # Motor ID 6
     "Right_Shoulder_Pitch", # Motor ID 7
     "Right_Shoulder_Roll",  # Motor ID 8
     "Right_Elbow_Pitch",    # Motor ID 9
     "Right_Elbow_Yaw",      # Motor ID 10
-    "Right_Wrist_Pitch",    # Motor ID 11
-    "Right_Wrist_Yaw",      # Motor ID 12
-    "Right_Hand_Roll",      # Motor ID 13
     "Waist",                # Motor ID 14
     "Left_Hip_Pitch",       # Motor ID 15
     "Left_Hip_Roll",        # Motor ID 16

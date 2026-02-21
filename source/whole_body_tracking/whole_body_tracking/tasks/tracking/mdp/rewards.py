@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors import ContactSensor
 from isaaclab.utils.math import quat_error_magnitude
-from whole_body_tracking.utils.ft import CTRL_NUM, EEF_NUM
+from whole_body_tracking.utils.ft import CTRL_NUM, EEF_NUM, TORQUE_LIMITS
 
 from whole_body_tracking.tasks.tracking.mdp.commands import MotionCommand
 
@@ -173,9 +173,6 @@ def ft_tau_ref(env: ManagerBasedRLEnv) -> torch.Tensor:
     exp_err = torch.exp(-frc_err / (sigma ** 2))
     return exp_err
 
-TORQUE_LIMITS = torch.tensor([
-    7, 18, 18, 30, 7, 18, 18, 45, 45, 18, 18, 25, 25, 18, 18, 25, 25, 18, 18, 60, 60, 18, 18, 24, 24, 18, 18, 15, 15
-], dtype=torch.float32)
 
 def ft_tau_limit(env: ManagerBasedRLEnv) -> torch.Tensor:
     ff_torque = env.ft_rew_info["ff_tau"]
