@@ -169,7 +169,7 @@ def ft_tau_ref(env: ManagerBasedRLEnv) -> torch.Tensor:
     tau_ref = env.ft_rew_info["ff_tau"]
     # Reward for minimizing error between applied torque and ff torque
     frc_err = torch.sum(torch.square(applied_torque - tau_ref), dim=-1)
-    sigma = 100
+    sigma = 75
     exp_err = torch.exp(-frc_err / (sigma ** 2))
     return exp_err
 
