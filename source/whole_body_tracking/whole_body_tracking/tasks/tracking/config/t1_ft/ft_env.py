@@ -7,7 +7,7 @@ from isaaclab.managers import ActionManager, EventManager, ObservationManager, R
 from isaaclab.managers import CommandManager, CurriculumManager, RewardManager, TerminationManager
 from isaaclab.ui.widgets import ManagerLiveVisualizer
 import time
-from whole_body_tracking.utils.ft import EEF_BODIES
+from whole_body_tracking.utils.ft import EEF_BODIES, CTRL_NUM
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.utils.math import quat_from_angle_axis, quat_mul
 import re
@@ -262,7 +262,7 @@ class FTEnv(ManagerBasedRLEnv):
             "com_angvel": torch.zeros((self.num_envs, 3), device=self.device),
             "mass_fac": torch.ones((self.num_envs,), device = self.device),
             "i_fac": torch.ones((self.num_envs, 3, 3), device = self.device),
-            "jac_fac": torch.ones((self.num_envs, 24, 29 + 6), device = self.device),
+            "jac_fac": torch.ones((self.num_envs, 24, CTRL_NUM + 6), device = self.device),
             "pos": torch.zeros((self.num_envs, 5, 3), device = self.device),
             "grav_vec": torch.zeros((self.num_envs, 3), device = self.device)
         }
