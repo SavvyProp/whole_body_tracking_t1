@@ -128,7 +128,7 @@ def randomize_lcc(
     angvel_offsets = math_utils.sample_uniform(angvel_range[0], angvel_range[1], (len(env_ids), 3), device=env.device)
     mass_facs = math_utils.sample_uniform(mass_fac_range[0], mass_fac_range[1], (len(env_ids),), device=env.device)
     i_facs = math_utils.sample_uniform(i_fac_range[0], i_fac_range[1], (len(env_ids),3, 3), device=env.device)
-    jac_facs = math_utils.sample_uniform(jac_fac_range[0], jac_fac_range[1], (len(env_ids), 24, 29 + 6), device=env.device)
+    jac_facs = math_utils.sample_uniform(jac_fac_range[0], jac_fac_range[1], (len(env_ids), 24, 23 + 6), device=env.device)
     pos_offsets = math_utils.sample_uniform(pos_range[0], pos_range[1], (len(env_ids), 5, 3), device=env.device)
     grav_vec = math_utils.sample_uniform(-0.5, 0.5, (len(env_ids), 3), device=env.device)
     
