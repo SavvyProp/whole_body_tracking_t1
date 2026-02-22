@@ -41,7 +41,7 @@ TORQUE_LIMITS_COST = torch.tensor([
 ], device = "cuda")
 
 CTRL_NUM = 23
-MASS = 34.634069
+MASS = 31.614357
 #SPHERE_RAD = 0.30
 #SPHERE_MOI = 0.4 * MASS * SPHERE_RAD * SPHERE_RAD
 #ANGULAR_INERTIA = torch.tensor(
@@ -100,8 +100,8 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits_cost)
 
-    d_gain_lin = 15.0
-    d_gain_angvel = 15.0
+    d_gain_lin = 5.0
+    d_gain_angvel = 10.0
 
     return {
         "des_pos": des_pos,
