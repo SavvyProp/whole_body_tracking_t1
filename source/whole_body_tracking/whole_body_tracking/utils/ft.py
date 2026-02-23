@@ -100,8 +100,8 @@ def ctrl2components(act):
     # Create torque weights on the same device/dtype as runtime tensors.
     torque_weight = torch.square(1.0 / torque_limits_cost)
 
-    d_gain_lin = 5.0
-    d_gain_angvel = 10.0
+    d_gain_lin = 10.0
+    d_gain_angvel = 15.0
 
     return {
         "des_pos": des_pos,
@@ -109,44 +109,6 @@ def ctrl2components(act):
         "des_com_angvel": des_angvel,
         "w": w,
         "torque": tau,
-        "d_gain_lin": d_gain_lin,
-        "d_gain_angvel": d_gain_angvel,
-        "torque_weight": torque_weight
-    }
-
-def ctrl2components_ftf(act):
-    des_pos = act[:, 0:CTRL_NUM]
-    des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3] * 0.25
-    des_com_angvel = act[:, CTRL_NUM + 3:CTRL_NUM + 6] * 0.50
-
-    d_gain_lin = 15.0
-    d_gain_angvel = 10.0
-
-    return {
-        "des_pos": des_pos,
-        "des_com_vel": des_com_vel,
-        "des_com_angvel": des_com_angvel,
-        "d_gain_lin": d_gain_lin,
-        "d_gain_angvel": d_gain_angvel,
-    }
-
-def ctrl2components_ftft(act):
-    des_pos = act[:, 0:CTRL_NUM]
-    des_com_vel = act[:, CTRL_NUM:CTRL_NUM + 3] * 0.25
-    des_com_angvel = act[:, CTRL_NUM + 3:CTRL_NUM + 6] * 0.50
-    des_tau = act[:, CTRL_NUM + 6:CTRL_NUM * 2 + 6]
-    torque_limits = TORQUE_LIMITS.to(device=des_tau.device, dtype=des_tau.dtype)
-    tau = torque_limits[None, :] * torch.tanh(des_tau * 0.5)
-    torque_weight = torch.square(1.0 / torque_limits)
-
-    d_gain_lin = 15.0
-    d_gain_angvel = 10.0
-
-    return {
-        "des_pos": des_pos,
-        "des_tau": tau,
-        "des_com_vel": des_com_vel,
-        "des_com_angvel": des_com_angvel,
         "d_gain_lin": d_gain_lin,
         "d_gain_angvel": d_gain_angvel,
         "torque_weight": torque_weight
