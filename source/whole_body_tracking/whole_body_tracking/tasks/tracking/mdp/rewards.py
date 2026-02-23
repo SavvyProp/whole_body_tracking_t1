@@ -142,15 +142,16 @@ def ft_action_rate_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
         des_com_angvel = vec[:, CTRL_NUM * 2 + EEF_NUM + 4:
                     CTRL_NUM * 2 + EEF_NUM + 7]
         non_w = torch.cat([
-            des_com_vel, torque, des_com_angvel
+            des_com_vel, des_com_angvel
         ], axis = -1)
-        return des_pos, non_w, w
-    c_pos, c_rem, c_w = slice_action(env.action_manager.action)
-    p_pos, p_rem, p_w = slice_action(env.action_manager.prev_action)
+        return des_pos, non_w, torque, w
+    c_pos, c_rem, c_torque, c_w = slice_action(env.action_manager.action)
+    p_pos, p_rem, p_torque, p_w = slice_action(env.action_manager.prev_action)
     pos_l2_err = torch.sum(torch.square(c_pos - p_pos), dim=-1)
     remaining_l2_err = torch.sum(torch.square(c_rem - p_rem), dim=-1)
     w_l2_err = torch.sum(torch.square(c_w - p_w), dim=-1)
-    return pos_l2_err + remaining_l2_err * 0.10 + w_l2_err * 1e-2
+    torque_l2_err = torch.sum(torch.square(c_torque - p_torque), dim=-1)
+    return pos_l2_err + remaining_l2_err * 0.10 + w_l2_err * 1e-2 + torque_l2_err * 1e-3
 
 def ft_force_correctness(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
