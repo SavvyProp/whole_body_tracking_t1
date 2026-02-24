@@ -412,12 +412,12 @@ class RewardsCfg:
     motion_body_lin_vel = RewTerm(
         func=mdp.motion_global_body_linear_velocity_error_exp,
         weight=1.5,
-        params={"command_name": "motion", "std": 0.25},
+        params={"command_name": "motion", "std": 0.6},
     )
     motion_body_ang_vel = RewTerm(
         func=mdp.motion_global_body_angular_velocity_error_exp,
         weight=1.5,
-        params={"command_name": "motion", "std": 3.14/1.5},
+        params={"command_name": "motion", "std": 3.14/1.0},
     )
     action_rate_l2 = RewTerm(func=mdp.ft_action_rate_l2, weight=-8e-2)
     joint_limit = RewTerm(
