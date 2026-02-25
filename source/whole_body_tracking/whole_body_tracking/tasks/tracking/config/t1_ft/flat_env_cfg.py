@@ -20,12 +20,12 @@ class T1FTEnvCfg(TrackingFTEnvCfg):
             "Hip_Yaw_Left",
             "Shank_Left",
             "left_foot_link",
-            "Ankle_Cross_Left"
+            "Ankle_Cross_Left",
             "Hip_Roll_Right",
             "Hip_Yaw_Right",
             "Shank_Right",
             "right_foot_link",
-            "Ankle_Cross_Right"
+            "Ankle_Cross_Right",
             "Waist",
             "AL2",
             "AL3",
