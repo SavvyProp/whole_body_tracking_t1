@@ -17,11 +17,15 @@ class T1FTEnvCfg(TrackingFTEnvCfg):
         self.commands.motion.body_names = [
             "Trunk",
             "Hip_Roll_Left",
+            "Hip_Yaw_Right",
             "Shank_Left",
             "left_foot_link",
+            "Ankle_Cross_Left"
             "Hip_Roll_Right",
+            "Hip_Yaw_Right",
             "Shank_Right",
             "right_foot_link",
+            "Ankle_Cross_Right"
             "Waist",
             "AL2",
             "AL3",
