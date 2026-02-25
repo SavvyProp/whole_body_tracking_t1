@@ -12,15 +12,18 @@ from whole_body_tracking.assets import ASSET_DIR
 NATURAL_FREQ = 10 * 2.0 * 3.1415926535  # 10Hz
 DAMPING_RATIO = 2.0
 
-ARMATURE_MID = 0.01
-ARMATURE_HIGH = 0.025
+ARMATURE_ANK = 0.01
+ARMATURE_HIGH = 0.03
+ARMATURE_MID = 0.02
 ARMATURE_LOW = 0.005
 
 STIFFNESS_LOW = ARMATURE_LOW * NATURAL_FREQ**2
+STIFFNESS_ANK = ARMATURE_ANK * NATURAL_FREQ**2
 STIFFNESS_MID = ARMATURE_MID * NATURAL_FREQ**2
 STIFFNESS_HIGH = ARMATURE_HIGH * NATURAL_FREQ**2
 
 DAMPING_LOW = 2.0 * DAMPING_RATIO * ARMATURE_LOW * NATURAL_FREQ
+DAMPING_ANK = 2.0 * DAMPING_RATIO * ARMATURE_ANK * NATURAL_FREQ
 DAMPING_MID = 2.0 * DAMPING_RATIO * ARMATURE_MID * NATURAL_FREQ
 DAMPING_HIGH = 2.0 * DAMPING_RATIO * ARMATURE_HIGH * NATURAL_FREQ
 
@@ -116,9 +119,9 @@ BOOSTER_T1_CFG = ArticulationCfg(
             joint_names_expr=[".*_Ankle_Pitch", ".*_Ankle_Roll"],
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
-            stiffness=STIFFNESS_LOW,
-            damping=DAMPING_LOW,
-            armature=ARMATURE_LOW,
+            stiffness=STIFFNESS_ANK,
+            damping=DAMPING_ANK,
+            armature=ARMATURE_ANK,
         ),
         "arms": ImplicitActuatorCfg(
             joint_names_expr=[
@@ -238,9 +241,9 @@ BOOSTER_T1_LOWGAIN_CFG = ArticulationCfg(
             joint_names_expr=[".*_Ankle_Pitch", ".*_Ankle_Roll"],
             effort_limit_sim={".*_Ankle_Pitch": 24, ".*_Ankle_Roll": 15},
             velocity_limit_sim={".*_Ankle_Pitch": 18.8, ".*_Ankle_Roll": 12.4},
-            stiffness=STIFFNESS_LOW * FT_FAC,
-            damping=DAMPING_LOW,# * FT_FAC * 2.0,
-            armature=ARMATURE_LOW,
+            stiffness=STIFFNESS_ANK * FT_FAC,
+            damping=DAMPING_ANK,# * FT_FAC * 2.0,
+            armature=ARMATURE_ANK,
         ),
         "arms": ImplicitActuatorCfg(
             joint_names_expr=[
