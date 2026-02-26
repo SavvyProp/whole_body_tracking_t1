@@ -320,22 +320,22 @@ class RewardsCfg:
     motion_body_pos = RewTerm(
         func=mdp.motion_relative_body_position_error_exp,
         weight=1.25,
-        params={"command_name": "motion", "std": 0.15},
+        params={"command_name": "motion", "std": 0.2},
     )
     motion_body_ori = RewTerm(
         func=mdp.motion_relative_body_orientation_error_exp,
         weight=1.25,
-        params={"command_name": "motion", "std": 0.2},
+        params={"command_name": "motion", "std": 0.3},
     )
     motion_body_lin_vel = RewTerm(
         func=mdp.motion_global_body_linear_velocity_error_exp,
         weight=1.0,
-        params={"command_name": "motion", "std": 0.5},
+        params={"command_name": "motion", "std": 0.75},
     )
     motion_body_ang_vel = RewTerm(
         func=mdp.motion_global_body_angular_velocity_error_exp,
         weight=1.0,
-        params={"command_name": "motion", "std": 3.14/1.5},
+        params={"command_name": "motion", "std": 3.14/1.25},
     )
     action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-1e-1)
     joint_limit = RewTerm(
